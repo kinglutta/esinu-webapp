@@ -26,24 +26,21 @@ phone, Add to Home Screen opens ESINU in a standalone window.
 | `GET /api/channels` | Parsed channels as JSON |
 | `GET /api/channels?refresh=1` | Force playlist re-download |
 | `GET /api/health` | Local health/status check |
-| `GET /api/movies` | Movie listings from 7reels (`section`, `q`, `genre`, `page`) |
-| `GET /api/movies/genres` | Movie genres from 7reels |
-| `GET /api/movies/<id>` | Movie details and credits from 7reels |
+| `GET /api/movies` | Movie listings (`section`, `q`, `genre`, `page`) |
+| `GET /api/movies/genres` | Movie genres |
+| `GET /api/movies/<id>` | Movie details and credits |
 | `GET /stream/<id>` | Local HLS proxy for curated Ghanaian channels |
 | `GET /sw.js` | Service worker served with root scope |
 
 ## Movies
 
-The **Movies** tab browses the TMDB-backed catalog exposed by
-[7reels](https://7reels.cc/). It includes trending, popular, top-rated,
-now-playing and discover rows, search, genre chips, pagination and a details
-dialog with synopsis, rating, director and cast.
+The **Movies** tab browses a TMDB-backed movie catalog. It includes trending,
+popular, top-rated, now-playing and discover rows, search, genre chips,
+pagination and a details dialog with synopsis, rating, director and cast.
 
 ESINU proxies the metadata so the browser does not need direct API access.
-Selecting a movie opens its details, and **Play in ESINU** opens the same player
-frame that 7reels uses on its watch pages inside the app. ESINU does **not** host
-movie files or expose stream URLs; playback is provided by 7reels. An
-**Open on 7reels** link remains available if the embedded player is blocked.
+Selecting a movie opens its details, and **Play in ESINU** starts playback in
+the in-app player. ESINU does **not** host movie files or expose stream URLs.
 The Movies tab is also linkable at `/#movies`.
 
 ## Ghanaian channels
@@ -82,8 +79,8 @@ Environment variables:
 
 - `PLAYLIST_URL` — playlist source URL
 - `PLAYLIST_TIMEOUT` — download timeout in seconds (default `30`)
-- `REELS_BASE_URL` — 7reels base URL (default `https://7reels.cc`)
-- `MOVIE_TIMEOUT` — 7reels API timeout in seconds (default `15`)
+- `MOVIE_SOURCE_URL` — movie catalog base URL
+- `MOVIE_TIMEOUT` — movie API timeout in seconds (default `15`)
 - `MOVIE_LANGUAGE` — catalog language (default `en-US`)
 - `HOST`, `PORT`, `FLASK_DEBUG` — server settings
 - `LOG_LEVEL` — logging level (default `INFO`)

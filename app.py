@@ -25,9 +25,9 @@ USER_AGENT = os.getenv(
     "PLAYLIST_USER_AGENT", "Mozilla/5.0 (compatible; ESINU/1.0)"
 )
 
-# 7reels exposes a TMDB-backed catalog API. We proxy metadata only; movies are
-# played on 7reels itself so ESINU never embeds an unlicensed stream.
-REELS_BASE_URL = os.getenv("REELS_BASE_URL", "https://7reels.cc").rstrip("/")
+# Movie metadata is proxied through ESINU so the browser never talks to the
+# catalog directly. Playback stays inside the app; ESINU hosts no movie files.
+MOVIE_SOURCE_URL = os.getenv("MOVIE_SOURCE_URL", "https://7reels.cc").rstrip("/")
 MOVIE_TIMEOUT = float(os.getenv("MOVIE_TIMEOUT", "15"))
 MOVIE_LANGUAGE = os.getenv("MOVIE_LANGUAGE", "en-US")
 
@@ -409,7 +409,7 @@ def _image_url(path, size: str = "w500") -> str | None:
 
 
 def _normalize_movie(item) -> dict | None:
-    """Convert a 7reels/TMDB movie record into the shape the UI expects."""
+    """Convert a catalog movie record into the shape the UI expects."""
     if not isinstance(item, dict):
         return None
     if str(item.get("media_type") or "movie").lower() != "movie":
@@ -476,7 +476,6 @@ def _normalize_movie(item) -> dict | None:
         "voteCount": _safe_int(item.get("vote_count"), 0),
         "genreIds": genre_ids,
         "genres": genres[:3],
-        "watchUrl": f"{REELS_BASE_URL}/movie/{movie_id}/watch",
     }
 
 
@@ -521,24 +520,24 @@ def _normalize_movie_detail(data: dict) -> dict | None:
     return movie
 
 
-def _fetch_reels_json(path: str, params: dict | None = None) -> dict:
-    """Fetch JSON from 7reels with browser-like headers and a bounded timeout."""
+def _fetch_movie_json(path: str, params: dict | None = None) -> dict:
+    """Fetch catalog JSON with browser-like headers and a bounded timeout."""
     if not path.startswith("/api/"):
         path = "/api/" + path.lstrip("/")
     response = requests.get(
-        f"{REELS_BASE_URL}{path}",
+        f"{MOVIE_SOURCE_URL}{path}",
         params=params or {},
         timeout=(5, MOVIE_TIMEOUT),
         headers={
             "User-Agent": USER_AGENT,
             "Accept": "application/json",
-            "Referer": f"{REELS_BASE_URL}/",
+            "Referer": f"{MOVIE_SOURCE_URL}/",
         },
     )
     response.raise_for_status()
     payload = response.json()
     if not isinstance(payload, dict):
-        raise ValueError("Unexpected response from 7reels")
+        raise ValueError("Unexpected response from movie catalog")
     return payload
 
 
@@ -594,7 +593,6 @@ def _movie_list_payload(
                 len(results), _safe_int(data.get("total_results"), 0) or 0
             ),
             "results": results,
-            "source": REELS_BASE_URL,
         }
     )
 
@@ -697,14 +695,13 @@ def api_health():
             "status": "ok",
             "playlist_present": present,
             "channel_count": count,
-            "movie_source": REELS_BASE_URL,
         }
     )
 
 
 @app.get("/api/movies")
 def api_movies():
-    """Return movie listings from 7reels' TMDB-backed catalog API."""
+    """Return movie listings from the proxied catalog API."""
     section = request.args.get("section", "trending").strip().lower() or "trending"
     page = max(1, min(_safe_int(request.args.get("page"), 1) or 1, 20))
     query = request.args.get("q", "").strip()
@@ -714,7 +711,7 @@ def api_movies():
         if section == "search":
             if not query:
                 return _movie_list_payload({}, section, page, query)
-            data = _fetch_reels_json(
+            data = _fetch_movie_json(
                 "/api/search/smart",
                 {"q": query, "page": page, "language": MOVIE_LANGUAGE},
             )
@@ -726,7 +723,7 @@ def api_movies():
             path, params = MOVIE_SECTIONS["discover"]
             params = dict(params)
             params.update({"page": page, "with_genres": genre})
-            data = _fetch_reels_json(path, params)
+            data = _fetch_movie_json(path, params)
             return _movie_list_payload(data, section, page)
 
         if section not in MOVIE_SECTIONS:
@@ -735,20 +732,20 @@ def api_movies():
         path, params = MOVIE_SECTIONS[section]
         params = dict(params)
         params["page"] = page
-        data = _fetch_reels_json(path, params)
+        data = _fetch_movie_json(path, params)
         return _movie_list_payload(data, section, page)
     except requests.RequestException as exc:
-        return _api_error(f"Could not reach 7reels: {exc}", 502)
+        return _api_error(f"Could not reach movie catalog: {exc}", 502)
     except (ValueError, TypeError) as exc:
         return _api_error(str(exc), 500)
 
 
 @app.get("/api/movies/genres")
 def api_movie_genres():
-    """Return movie genres, with a local fallback if 7reels is unreachable."""
+    """Return movie genres, with a local fallback if the catalog is unreachable."""
     data: dict = {}
     try:
-        data = _fetch_reels_json(
+        data = _fetch_movie_json(
             "/api/tmdb/genre/movie/list", {"language": MOVIE_LANGUAGE}
         )
     except (requests.RequestException, ValueError, TypeError) as exc:
@@ -773,14 +770,14 @@ def api_movie_genres():
 
 @app.get("/api/movies/<int:movie_id>")
 def api_movie_detail(movie_id: int):
-    """Return details and credits for one 7reels movie."""
+    """Return details and credits for one movie."""
     try:
-        data = _fetch_reels_json(
+        data = _fetch_movie_json(
             f"/api/tmdb/movie/{movie_id}",
             {"language": MOVIE_LANGUAGE, "append_to_response": "credits"},
         )
     except requests.RequestException as exc:
-        return _api_error(f"Could not reach 7reels: {exc}", 502)
+        return _api_error(f"Could not reach movie catalog: {exc}", 502)
     except (ValueError, TypeError) as exc:
         return _api_error(str(exc), 500)
 

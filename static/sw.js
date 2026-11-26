@@ -1,4 +1,4 @@
-const CACHE_NAME = "esinu-shell-v4";
+const CACHE_NAME = "esinu-shell-v5";
 const SHELL_URLS = [
     "/",
     "/static/style.css",

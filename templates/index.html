@@ -30,13 +30,6 @@
                 aria-controls="movies-view"
             >🎬 Movies</button>
         </nav>
-        <a
-            class="source-link"
-            href="https://7reels.cc"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open 7reels in a new tab"
-        >Movie data by 7reels ↗</a>
     </header>
 
     <div id="live-view" class="app">
@@ -144,9 +137,9 @@
     <section id="movies-view" class="movies-view" aria-label="Movie browser" hidden>
         <div class="movies-toolbar">
             <div class="movies-heading">
-                <span class="movies-kicker">7reels catalog</span>
+                <span class="movies-kicker">ESINU movies</span>
                 <h1>Discover movies</h1>
-                <p>Browse titles from 7reels and watch them right here in ESINU.</p>
+                <p>Browse the catalog and watch right here in ESINU.</p>
             </div>
             <div class="movie-search-wrap">
                 <span class="movie-search-icon" aria-hidden="true">⌕</span>
@@ -188,7 +181,7 @@
             <button id="movie-retry" class="movie-retry" type="button" hidden>Retry</button>
         </div>
 
-        <p class="movie-disclaimer">Movie metadata and playback are provided by 7reels. ESINU does not host movie files.</p>
+        <p class="movie-disclaimer">ESINU does not host movie files. Playback runs in the app player.</p>
     </section>
 
     <div
@@ -226,13 +219,6 @@
                         type="button"
                         hidden
                     >▶ Play in ESINU</button>
-                    <a
-                        id="movie-watch-link"
-                        class="movie-secondary"
-                        href="https://7reels.cc"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >Open on 7reels ↗</a>
                     <button id="movie-modal-secondary" class="movie-secondary" type="button" hidden>Close</button>
                 </div>
                 <p id="movie-detail-status" class="movie-detail-status" role="status" aria-live="polite"></p>
@@ -255,13 +241,6 @@
                     <h2 id="movie-player-title">Movie</h2>
                 </div>
                 <div class="movie-player-actions">
-                    <a
-                        id="movie-player-source"
-                        class="movie-secondary"
-                        href="https://7reels.cc"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >Open on 7reels ↗</a>
                     <button
                         id="movie-player-close"
                         class="icon-button"
@@ -281,7 +260,7 @@
                 ></iframe>
             </div>
             <p class="movie-player-note">
-                Playback is provided by 7reels. If the player does not start, use “Open on 7reels”.
+                If playback does not start, close the player and try another title.
             </p>
         </div>
     </div>
@@ -1051,11 +1030,9 @@
                 detailCredits: byId("movie-detail-credits"),
                 detailStatus: byId("movie-detail-status"),
                 playButton: byId("movie-play-button"),
-                watchLink: byId("movie-watch-link"),
                 player: byId("movie-player"),
                 playerFrame: byId("movie-player-frame"),
                 playerTitle: byId("movie-player-title"),
-                playerSource: byId("movie-player-source"),
                 playerClose: byId("movie-player-close"),
             };
 
@@ -1069,7 +1046,7 @@
                 genre: "Movies by genre",
             };
 
-            // This is the same player frame 7reels uses on its watch pages.
+            // In-app movie player endpoint.
             const PLAYER_BASE = "https://vidy.st/movie";
 
             const state = {
@@ -1182,7 +1159,7 @@
                 meta.className = "movie-card-meta";
                 meta.textContent = [movie.year, (movie.genres || [])[0]]
                     .filter(Boolean)
-                    .join(" · ") || "7reels";
+                    .join(" · ") || "ESINU";
                 body.append(title, meta);
                 button.append(poster, body);
                 article.appendChild(button);
@@ -1236,7 +1213,7 @@
                 const requestId = ++state.requestId;
                 state.loading = true;
                 els.grid.classList.add("is-loading");
-                setStatus("Loading movies from 7reels...", false);
+                setStatus("Loading movies...", false);
 
                 try {
                     const params = new URLSearchParams({
@@ -1344,12 +1321,11 @@
                 els.detailGenres.replaceChildren();
                 els.detailOverview.textContent = "";
                 els.detailCredits.replaceChildren();
-                els.detailStatus.textContent = "Loading details from 7reels...";
+                els.detailStatus.textContent = "Loading details...";
                 els.detailPoster.hidden = true;
                 els.detailPlaceholder.hidden = false;
                 els.detailPlaceholder.replaceChildren(makePlaceholder("").firstChild);
                 els.playButton.hidden = true;
-                els.watchLink.href = `https://7reels.cc/movie/${movieId}/watch`;
 
                 try {
                     const movie = await api(`/api/movies/${movieId}`);
@@ -1361,7 +1337,6 @@
                         Number(movie.rating) > 0 ? `★ ${Number(movie.rating).toFixed(1)}` : null,
                     ].filter(Boolean).join(" · ");
                     els.detailOverview.textContent = movie.overview || "";
-                    els.watchLink.href = movie.watchUrl || els.watchLink.href;
                     els.playButton.dataset.movieId = String(movie.id || movieId);
                     els.playButton.hidden = false;
 
@@ -1405,7 +1380,6 @@
                 byId("video-player")?.pause();
 
                 els.playerTitle.textContent = safeTitle;
-                els.playerSource.href = `https://7reels.cc/movie/${id}/watch`;
                 els.playerFrame.title = safeTitle;
                 els.playerFrame.src =
                     `${PLAYER_BASE}/${id}?autoplay=true&overlay=true&color=16A085`;
