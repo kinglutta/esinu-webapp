@@ -25,9 +25,9 @@ USER_AGENT = os.getenv(
     "PLAYLIST_USER_AGENT", "Mozilla/5.0 (compatible; ESINU/1.0)"
 )
 
-# Curated free-to-air Ghanaian streams that are embedded publicly by
-# LiveGhanaTV. They require a Referer header, so the app proxies them locally.
-# Use only streams you are legally permitted to watch.
+# Curated free-to-air Ghanaian streams from LiveGhanaTV and the iptv-org Ghana
+# list. The LiveGhanaTV CDNs require a Referer header, so the app proxies all
+# curated streams locally. Use only streams you are legally permitted to watch.
 GHANA_SOURCE_REFERER = "https://liveghanatv.com/"
 GHANA_STREAMS = {
     "adom": {
@@ -90,6 +90,24 @@ GHANA_STREAMS = {
         "logo": "https://i.imgur.com/8t967Hq.png",
         "group": "Ghana · Entertainment",
         "url": "https://g2qd3exjy7an-hls-live.5centscdn.com/webtv3/ghanatv.stream/playlist.m3u8",
+        "referer": GHANA_SOURCE_REFERER,
+    },
+    "citi-tv": {
+        "name": "Citi TV Ghana",
+        "group": "Ghana · News",
+        "url": "https://hls5092146.r-cdn.com/trn_61805/5964/playlist.m3u8",
+        "referer": GHANA_SOURCE_REFERER,
+    },
+    "tv-africa": {
+        "name": "TV Africa",
+        "group": "Ghana · General",
+        "url": "https://g2qd3exjy7an-hls-live.5centscdn.com/tvafrica/ghanaweb.stream/playlist.m3u8",
+        "referer": GHANA_SOURCE_REFERER,
+    },
+    "g-eye": {
+        "name": "G-eye TV",
+        "group": "Ghana · General",
+        "url": "https://online.geyetv.com/hls/stream.m3u8",
         "referer": GHANA_SOURCE_REFERER,
     },
 }

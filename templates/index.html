@@ -176,6 +176,7 @@
                 loading: false,
                 searchTimer: null,
                 retryTimer: null,
+                loadTimer: null,
                 autoSkipTimer: null,
                 autoSkipAttempts: 0,
                 autoSkipTried: new Set(),
@@ -185,6 +186,7 @@
 
             const AUTO_SKIP_LIMIT = 5;
             const AUTO_SKIP_DELAY = 900;
+            const LOAD_TIMEOUT = 15000;
 
             function channelKey(channel) {
                 return channel?.url || channel?.name || "";
@@ -232,6 +234,8 @@
             function resetAutoSkip() {
                 clearTimeout(state.autoSkipTimer);
                 state.autoSkipTimer = null;
+                clearTimeout(state.loadTimer);
+                state.loadTimer = null;
                 state.autoSkipAttempts = 0;
                 state.autoSkipTried.clear();
             }
@@ -247,6 +251,8 @@
             function autoSkip(channel) {
                 if (!channel) return;
 
+                clearTimeout(state.loadTimer);
+                state.loadTimer = null;
                 const key = channelKey(channel);
                 state.autoSkipTried.add(key);
                 state.autoSkipAttempts += 1;
@@ -462,6 +468,8 @@
             function destroyHls() {
                 clearTimeout(state.retryTimer);
                 state.retryTimer = null;
+                clearTimeout(state.loadTimer);
+                state.loadTimer = null;
                 state.networkRetries = 0;
                 if (state.hls) {
                     state.hls.destroy();
@@ -485,6 +493,17 @@
 
                 els.streamInfo.textContent = "Connecting...";
                 setOverlay("loading", "Connecting to stream...", () => playStream(channel));
+
+                // Some broken CDNs never emit a fatal HLS error, so skip streams
+                // that have not started within a reasonable time.
+                state.loadTimer = setTimeout(() => {
+                    state.loadTimer = null;
+                    if (state.selected !== channel) return;
+                    if (els.video.readyState < 3) {
+                        destroyHls();
+                        autoSkip(channel);
+                    }
+                }, LOAD_TIMEOUT);
 
                 if (els.video.canPlayType("application/vnd.apple.mpegurl")) {
                     // Safari and other browsers with native HLS support.
@@ -792,6 +811,8 @@
 
             function markPlaying() {
                 resetAutoSkip();
+                clearTimeout(state.loadTimer);
+                state.loadTimer = null;
                 hideOverlay();
                 els.streamInfo.textContent = `Playing · ${state.selected?.name || "stream"}`;
             }

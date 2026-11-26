@@ -1,8 +1,7 @@
 # ESINU
 
 ESINU is a small Flask app that downloads an M3U playlist, groups channels by
-country, and plays public HLS streams in the browser or in native mobile apps
-with `hls.js`.
+country, and plays public HLS streams in the browser with `hls.js`.
 
 ## Run locally
 
@@ -12,26 +11,6 @@ python app.py
 ```
 
 Open <http://127.0.0.1:5000>.
-
-## Mobile apps
-
-Native Android and iOS wrapper projects live in `esinu-mobile/`. They load the
-running Flask server inside a WebView, so start the server on all interfaces
-when testing on a phone:
-
-```powershell
-.\esinu-mobile\scripts\start-backend.ps1
-```
-
-The app URL is stored in `esinu-mobile/capacitor.config.json`. Change it with:
-
-```powershell
-cd esinu-mobile
-npm run configure -- http://YOUR-PC-IP:5000
-npm run build:android
-```
-
-See `esinu-mobile/README.md` for APK output, Android Studio and iOS/Xcode steps.
 
 ## Installable web app (PWA)
 
@@ -54,7 +33,9 @@ phone, Add to Home Screen opens ESINU in a standalone window.
 
 The app adds a curated free-to-air Ghana pack on top of the iptv-org playlist:
 Adom TV, GTV Ghana, GTV Sports, GhOne TV, AfroBeats TV, UTV Ghana, Atinka TV,
-Joy Prime, Metro TV Ghana and TV3 Ghana.
+Joy Prime, Metro TV Ghana, TV3 Ghana, Citi TV Ghana, TV Africa and G-eye TV.
+A few upstream streams may be offline at times; auto-skip moves to the next
+channel when that happens.
 
 Some of those CDNs require a `Referer` header that browsers cannot set, so the
 app proxies playlists and video segments locally. Use the **🇬🇭 Ghana** chip in
@@ -73,9 +54,10 @@ favorites and search filters.
 ## Playback
 
 If a channel's stream is unavailable, ESINU automatically tries the next
-channel in the current list. It stops after five consecutive failures and shows
-an error with a Retry button, so a broken playlist cannot cause an endless
-skip loop. Selecting a channel or navigating manually resets the counter.
+channel in the current list. A load timeout also skips streams that never
+start. It stops after five consecutive failures and shows an error with a Retry
+button, so a broken playlist cannot cause an endless skip loop. Selecting a
+channel or navigating manually resets the counter.
 
 ## Configuration
 
