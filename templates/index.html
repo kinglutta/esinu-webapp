@@ -176,8 +176,15 @@
                 loading: false,
                 searchTimer: null,
                 retryTimer: null,
+                autoSkipTimer: null,
+                autoSkipAttempts: 0,
+                autoSkipTried: new Set(),
+                ignoreErrorsUntil: 0,
                 networkRetries: 0,
             };
+
+            const AUTO_SKIP_LIMIT = 5;
+            const AUTO_SKIP_DELAY = 900;
 
             function channelKey(channel) {
                 return channel?.url || channel?.name || "";
@@ -220,6 +227,65 @@
                 els.overlayText.textContent = "";
                 els.retry.hidden = true;
                 state.overlayRetry = null;
+            }
+
+            function resetAutoSkip() {
+                clearTimeout(state.autoSkipTimer);
+                state.autoSkipTimer = null;
+                state.autoSkipAttempts = 0;
+                state.autoSkipTried.clear();
+            }
+
+            function showNoPlayableChannels(channel) {
+                els.streamInfo.textContent = "No playable channels found";
+                setOverlay("error", "No playable channels found in this list.", () => {
+                    resetAutoSkip();
+                    if (channel) playStream(channel);
+                });
+            }
+
+            function autoSkip(channel) {
+                if (!channel) return;
+
+                const key = channelKey(channel);
+                state.autoSkipTried.add(key);
+                state.autoSkipAttempts += 1;
+
+                if (state.autoSkipAttempts > AUTO_SKIP_LIMIT) {
+                    showNoPlayableChannels(channel);
+                    return;
+                }
+
+                const list = state.visible.length ? state.visible : state.channels;
+                const currentIndex = list.findIndex(
+                    (candidate) => channelKey(candidate) === key
+                );
+                let candidate = null;
+
+                if (currentIndex >= 0) {
+                    for (let offset = 1; offset <= list.length; offset += 1) {
+                        const next = list[(currentIndex + offset) % list.length];
+                        const nextKey = channelKey(next);
+                        if (nextKey !== key && !state.autoSkipTried.has(nextKey)) {
+                            candidate = next;
+                            break;
+                        }
+                    }
+                }
+
+                if (!candidate) {
+                    showNoPlayableChannels(channel);
+                    return;
+                }
+
+                els.streamInfo.textContent =
+                    `Stream unavailable - trying next (${state.autoSkipAttempts}/${AUTO_SKIP_LIMIT})`;
+                setOverlay("loading", "Stream unavailable - trying next channel...");
+                clearTimeout(state.autoSkipTimer);
+                state.autoSkipTimer = setTimeout(() => {
+                    state.autoSkipTimer = null;
+                    selectChannel(candidate);
+                }, AUTO_SKIP_DELAY);
             }
 
             function updateStatus() {
@@ -405,6 +471,7 @@
 
             function playStream(channel) {
                 const url = channel?.url;
+                state.ignoreErrorsUntil = Date.now() + 300;
                 destroyHls();
                 els.video.pause();
                 els.video.removeAttribute("src");
@@ -455,12 +522,8 @@
                         if (data.type === types.NETWORK_ERROR) {
                             const maxRetries = 3;
                             if (state.networkRetries >= maxRetries) {
-                                setOverlay(
-                                    "error",
-                                    "Network error. Check the connection and tap Retry.",
-                                    () => playStream(channel)
-                                );
                                 destroyHls();
+                                autoSkip(channel);
                                 return;
                             }
                             state.networkRetries += 1;
@@ -477,8 +540,8 @@
                             setOverlay("error", "Media error - recovering...", () => instance.recoverMediaError());
                             instance.recoverMediaError();
                         } else {
-                            setOverlay("error", "This stream could not be played.", () => playStream(channel));
                             destroyHls();
+                            autoSkip(channel);
                         }
                     });
 
@@ -520,6 +583,7 @@
             }
 
             function step(delta) {
+                resetAutoSkip();
                 const list = state.visible.length ? state.visible : state.channels;
                 if (list.length === 0) return;
 
@@ -532,6 +596,7 @@
             }
 
             function shuffleChannel() {
+                resetAutoSkip();
                 const list = state.visible.length ? state.visible : state.channels;
                 const pool = list.filter(
                     (channel) => channelKey(channel) !== channelKey(state.selected)
@@ -571,6 +636,7 @@
 
             async function loadChannels(force = false) {
                 if (state.loading) return;
+                resetAutoSkip();
                 state.loading = true;
                 const previousKey = state.selected ? channelKey(state.selected) : "";
                 els.list.classList.add("is-loading");
@@ -630,7 +696,10 @@
                 const channel = state.channels.find(
                     (candidate) => channelKey(candidate) === button.dataset.key
                 );
-                if (channel) selectChannel(channel);
+                if (channel) {
+                    resetAutoSkip();
+                    selectChannel(channel);
+                }
             });
 
             els.search.addEventListener("input", (event) => {
@@ -722,6 +791,7 @@
             });
 
             function markPlaying() {
+                resetAutoSkip();
                 hideOverlay();
                 els.streamInfo.textContent = `Playing · ${state.selected?.name || "stream"}`;
             }
@@ -734,10 +804,9 @@
                 setOverlay("loading", "Buffering...");
             });
             els.video.addEventListener("error", () => {
+                if (Date.now() < state.ignoreErrorsUntil) return;
                 els.streamInfo.textContent = "Stream unavailable";
-                setOverlay("error", "The stream could not be loaded.", () => {
-                    if (state.selected) playStream(state.selected);
-                });
+                autoSkip(state.selected);
             });
 
             window.addEventListener("beforeunload", destroyHls);
