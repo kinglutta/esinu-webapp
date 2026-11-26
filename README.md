@@ -1,7 +1,8 @@
 # ESINU
 
 ESINU is a small Flask app that downloads an M3U playlist, groups channels by
-country, and plays public HLS streams in the browser with `hls.js`.
+country, and plays public HLS streams in the browser or in native mobile apps
+with `hls.js`.
 
 ## Run locally
 
@@ -11,6 +12,26 @@ python app.py
 ```
 
 Open <http://127.0.0.1:5000>.
+
+## Mobile apps
+
+Native Android and iOS wrapper projects live in `esinu-mobile/`. They load the
+running Flask server inside a WebView, so start the server on all interfaces
+when testing on a phone:
+
+```powershell
+.\esinu-mobile\scripts\start-backend.ps1
+```
+
+The app URL is stored in `esinu-mobile/capacitor.config.json`. Change it with:
+
+```powershell
+cd esinu-mobile
+npm run configure -- http://YOUR-PC-IP:5000
+npm run build:android
+```
+
+See `esinu-mobile/README.md` for APK output, Android Studio and iOS/Xcode steps.
 
 ## Installable web app (PWA)
 
@@ -48,6 +69,13 @@ the sidebar to filter to a single country, or combine it with the group,
 favorites and search filters.
 
 > Only use playlists and streams you are legally allowed to access.
+
+## Playback
+
+If a channel's stream is unavailable, ESINU automatically tries the next
+channel in the current list. It stops after five consecutive failures and shows
+an error with a Retry button, so a broken playlist cannot cause an endless
+skip loop. Selecting a channel or navigating manually resets the counter.
 
 ## Configuration
 
