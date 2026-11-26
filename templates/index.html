@@ -146,7 +146,7 @@
             <div class="movies-heading">
                 <span class="movies-kicker">7reels catalog</span>
                 <h1>Discover movies</h1>
-                <p>Browse titles from 7reels. Playback opens safely on 7reels.</p>
+                <p>Browse titles from 7reels and watch them right here in ESINU.</p>
             </div>
             <div class="movie-search-wrap">
                 <span class="movie-search-icon" aria-hidden="true">⌕</span>
@@ -188,7 +188,7 @@
             <button id="movie-retry" class="movie-retry" type="button" hidden>Retry</button>
         </div>
 
-        <p class="movie-disclaimer">Movie metadata comes from 7reels and TMDB. ESINU does not host or embed movie streams.</p>
+        <p class="movie-disclaimer">Movie metadata and playback are provided by 7reels. ESINU does not host movie files.</p>
     </section>
 
     <div
@@ -220,17 +220,69 @@
                 <p id="movie-detail-overview" class="movie-detail-overview"></p>
                 <dl id="movie-detail-credits" class="movie-detail-credits"></dl>
                 <div class="movie-dialog-actions">
+                    <button
+                        id="movie-play-button"
+                        class="movie-watch-link"
+                        type="button"
+                        hidden
+                    >▶ Play in ESINU</button>
                     <a
                         id="movie-watch-link"
-                        class="movie-watch-link"
+                        class="movie-secondary"
                         href="https://7reels.cc"
                         target="_blank"
                         rel="noopener noreferrer"
-                    >Watch on 7reels ↗</a>
+                    >Open on 7reels ↗</a>
                     <button id="movie-modal-secondary" class="movie-secondary" type="button" hidden>Close</button>
                 </div>
                 <p id="movie-detail-status" class="movie-detail-status" role="status" aria-live="polite"></p>
             </div>
+        </div>
+    </div>
+
+    <div
+        id="movie-player"
+        class="movie-player-modal"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="movie-player-title"
+    >
+        <div class="movie-player-shell">
+            <header class="movie-player-header">
+                <div>
+                    <span class="movies-kicker">Now playing</span>
+                    <h2 id="movie-player-title">Movie</h2>
+                </div>
+                <div class="movie-player-actions">
+                    <a
+                        id="movie-player-source"
+                        class="movie-secondary"
+                        href="https://7reels.cc"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >Open on 7reels ↗</a>
+                    <button
+                        id="movie-player-close"
+                        class="icon-button"
+                        type="button"
+                        aria-label="Close movie player"
+                        title="Close (Esc)"
+                    >×</button>
+                </div>
+            </header>
+            <div class="movie-player-frame-wrap">
+                <iframe
+                    id="movie-player-frame"
+                    title="Movie player"
+                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                    allowfullscreen
+                    frameborder="0"
+                ></iframe>
+            </div>
+            <p class="movie-player-note">
+                Playback is provided by 7reels. If the player does not start, use “Open on 7reels”.
+            </p>
         </div>
     </div>
 
@@ -998,7 +1050,13 @@
                 detailOverview: byId("movie-detail-overview"),
                 detailCredits: byId("movie-detail-credits"),
                 detailStatus: byId("movie-detail-status"),
+                playButton: byId("movie-play-button"),
                 watchLink: byId("movie-watch-link"),
+                player: byId("movie-player"),
+                playerFrame: byId("movie-player-frame"),
+                playerTitle: byId("movie-player-title"),
+                playerSource: byId("movie-player-source"),
+                playerClose: byId("movie-player-close"),
             };
 
             const SECTION_LABELS = {
@@ -1010,6 +1068,9 @@
                 search: "Search results",
                 genre: "Movies by genre",
             };
+
+            // This is the same player frame 7reels uses on its watch pages.
+            const PLAYER_BASE = "https://vidy.st/movie";
 
             const state = {
                 view: window.location.hash === "#movies" ? "movies" : "live",
@@ -1287,6 +1348,7 @@
                 els.detailPoster.hidden = true;
                 els.detailPlaceholder.hidden = false;
                 els.detailPlaceholder.replaceChildren(makePlaceholder("").firstChild);
+                els.playButton.hidden = true;
                 els.watchLink.href = `https://7reels.cc/movie/${movieId}/watch`;
 
                 try {
@@ -1300,6 +1362,8 @@
                     ].filter(Boolean).join(" · ");
                     els.detailOverview.textContent = movie.overview || "";
                     els.watchLink.href = movie.watchUrl || els.watchLink.href;
+                    els.playButton.dataset.movieId = String(movie.id || movieId);
+                    els.playButton.hidden = false;
 
                     (movie.genres || []).forEach((name) => {
                         const badge = document.createElement("span");
@@ -1332,12 +1396,38 @@
                 }
             }
 
+            function playMovie(movieId, title) {
+                if (!movieId) return;
+                const id = encodeURIComponent(String(movieId));
+                const safeTitle = title || "Movie";
+
+                els.modal.hidden = true;
+                byId("video-player")?.pause();
+
+                els.playerTitle.textContent = safeTitle;
+                els.playerSource.href = `https://7reels.cc/movie/${id}/watch`;
+                els.playerFrame.title = safeTitle;
+                els.playerFrame.src =
+                    `${PLAYER_BASE}/${id}?autoplay=true&overlay=true&color=16A085`;
+                els.player.hidden = false;
+                document.body.classList.add("modal-open");
+            }
+
+            function closeMoviePlayer() {
+                els.player.hidden = true;
+                els.playerFrame.removeAttribute("src");
+                document.body.classList.remove("modal-open");
+            }
+
             function closeMovieDetails() {
                 els.modal.hidden = true;
                 document.body.classList.remove("modal-open");
             }
 
-            els.liveTab.addEventListener("click", () => setView("live"));
+            els.liveTab.addEventListener("click", () => {
+                if (!els.player.hidden) closeMoviePlayer();
+                setView("live");
+            });
             els.moviesTab.addEventListener("click", () => setView("movies"));
             window.addEventListener("hashchange", () => {
                 setView(window.location.hash === "#movies" ? "movies" : "live", false);
@@ -1403,15 +1493,31 @@
                 }
             });
 
+            els.playButton.addEventListener("click", () => {
+                playMovie(
+                    els.playButton.dataset.movieId,
+                    els.detailTitle.textContent
+                );
+            });
+
             els.retry.addEventListener("click", () => loadMovies());
             els.modalClose.addEventListener("click", closeMovieDetails);
             els.modalSecondary.addEventListener("click", closeMovieDetails);
             els.modal.addEventListener("click", (event) => {
                 if (event.target === els.modal) closeMovieDetails();
             });
+            els.playerClose.addEventListener("click", closeMoviePlayer);
+            els.player.addEventListener("click", (event) => {
+                if (event.target === els.player) closeMoviePlayer();
+            });
 
             document.addEventListener("keydown", (event) => {
-                if (event.key === "Escape" && !els.modal.hidden) closeMovieDetails();
+                if (event.key !== "Escape") return;
+                if (!els.player.hidden) {
+                    closeMoviePlayer();
+                } else if (!els.modal.hidden) {
+                    closeMovieDetails();
+                }
             });
 
             setView(state.view, false);

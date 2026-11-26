@@ -1211,12 +1211,14 @@ body.modal-open {
     display: inline-flex;
     align-items: center;
     padding: 10px 16px;
+    border: 0;
     border-radius: 10px;
     background: linear-gradient(135deg, var(--accent), var(--accent-deep));
     color: #04140d;
     font-size: 0.84rem;
     font-weight: 800;
     text-decoration: none;
+    cursor: pointer;
 }
 
 .movie-watch-link:hover {
@@ -1227,6 +1229,75 @@ body.modal-open {
     margin-top: 10px;
     color: #ffb4b4;
     font-size: 0.76rem;
+}
+
+.movie-player-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(2, 5, 7, 0.92);
+    backdrop-filter: blur(10px);
+}
+
+.movie-player-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: min(1120px, 100%);
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(17, 27, 32, 0.98), rgba(6, 11, 14, 0.98));
+    box-shadow: var(--shadow);
+}
+
+.movie-player-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.movie-player-header h2 {
+    margin-top: 4px;
+    font-size: clamp(1.1rem, 2.4vw, 1.6rem);
+    line-height: 1.2;
+}
+
+.movie-player-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.movie-player-frame-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 260px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: #000;
+}
+
+.movie-player-frame-wrap iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.movie-player-note {
+    color: rgba(137, 162, 154, 0.75);
+    font-size: 0.74rem;
+    text-align: center;
 }
 
 /* ---------- Animations ---------- */
@@ -1352,6 +1423,20 @@ body.modal-open {
     .movie-dialog-body {
         padding-right: 0;
     }
+
+    .movie-player-modal {
+        padding: 10px;
+    }
+
+    .movie-player-shell {
+        max-height: calc(100vh - 20px);
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    .movie-player-frame-wrap {
+        min-height: 220px;
+    }
 }
 
 @media (max-width: 520px) {
@@ -1433,6 +1518,21 @@ body.modal-open {
 
     .movie-detail-credits dd {
         margin-bottom: 6px;
+    }
+
+    .movie-player-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .movie-player-frame-wrap {
+        min-height: 180px;
+        border-radius: 10px;
+    }
+
+    .movie-player-note {
+        display: none;
     }
 }
 

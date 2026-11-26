@@ -39,10 +39,12 @@ The **Movies** tab browses the TMDB-backed catalog exposed by
 now-playing and discover rows, search, genre chips, pagination and a details
 dialog with synopsis, rating, director and cast.
 
-ESINU proxies the metadata so the browser does not need direct API access. It
-does **not** host or embed movie streams; the **Watch on 7reels** button opens
-the title on 7reels, where playback is provided by that service. The Movies tab
-is also linkable at `/#movies`.
+ESINU proxies the metadata so the browser does not need direct API access.
+Selecting a movie opens its details, and **Play in ESINU** opens the same player
+frame that 7reels uses on its watch pages inside the app. ESINU does **not** host
+movie files or expose stream URLs; playback is provided by 7reels. An
+**Open on 7reels** link remains available if the embedded player is blocked.
+The Movies tab is also linkable at `/#movies`.
 
 ## Ghanaian channels
 
