@@ -33,9 +33,9 @@ phone, Add to Home Screen opens ESINU in a standalone window.
 
 The app adds a curated free-to-air Ghana pack on top of the iptv-org playlist:
 Adom TV, GTV Ghana, GTV Sports, GhOne TV, AfroBeats TV, UTV Ghana, Atinka TV,
-Joy Prime, Metro TV Ghana, TV3 Ghana, Citi TV Ghana, TV Africa and G-eye TV.
-A few upstream streams may be offline at times; auto-skip moves to the next
-channel when that happens.
+Joy Prime, Metro TV Ghana, TV3 Ghana, Citi TV Ghana, TV Africa, G-eye TV and
+Faculty TV. A few upstream streams may be offline at times; auto-skip moves to
+the next channel when that happens.
 
 Some of those CDNs require a `Referer` header that browsers cannot set, so the
 app proxies playlists and video segments locally. Use the **🇬🇭 Ghana** chip in

@@ -110,6 +110,12 @@ GHANA_STREAMS = {
         "url": "https://online.geyetv.com/hls/stream.m3u8",
         "referer": GHANA_SOURCE_REFERER,
     },
+    "faculty-tv": {
+        "name": "Faculty TV",
+        "group": "Ghana · General",
+        "url": "https://stream-server9-jupiter.muxlive.com/hls/facultytv/index.m3u8",
+        "referer": GHANA_SOURCE_REFERER,
+    },
 }
 
 _URI_RE = re.compile(r'URI="([^"]+)"')
