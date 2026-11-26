@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+data/playlist.m3u
+.DS_Store
+.venv/
+venv/

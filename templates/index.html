@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#07100c">
+    <meta name="description" content="ESINU — a live channel guide for public HLS streams.">
+    <title>ESINU — Live Channel Guide</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='hls.min.js') }}" defer></script>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar" aria-label="ESINU channel browser">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-mark" aria-hidden="true"><span>E</span></div>
+                    <div class="brand-copy">
+                        <strong>ESINU</strong>
+                        <small>LIVE CHANNEL GUIDE</small>
+                    </div>
+                    <span id="channel-count" class="count-badge" aria-live="polite">0</span>
+                </div>
+
+                <div class="sidebar-title-row">
+                    <h2>Browse channels</h2>
+                    <span class="live-pill"><i aria-hidden="true"></i> LIVE</span>
+                </div>
+
+                <div class="search-wrap">
+                    <span class="search-icon" aria-hidden="true">⌕</span>
+                    <input
+                        type="search"
+                        id="channel-search"
+                        placeholder="Search channels, groups or countries..."
+                        autocomplete="off"
+                        aria-label="Search channels"
+                    >
+                    <button
+                        id="clear-search"
+                        class="icon-button clear-search"
+                        type="button"
+                        aria-label="Clear search"
+                        title="Clear search"
+                        hidden
+                    >×</button>
+                </div>
+
+                <div class="filter-row">
+                    <select id="country-filter" aria-label="Filter by country">
+                        <option value="">All countries</option>
+                    </select>
+                    <select id="group-filter" aria-label="Filter by group">
+                        <option value="">All groups</option>
+                    </select>
+                    <button
+                        id="ghana-filter"
+                        class="filter-button"
+                        type="button"
+                        aria-pressed="false"
+                        title="Show Ghanaian channels only"
+                    >🇬🇭 Ghana</button>
+                    <button
+                        id="favorites-filter"
+                        class="filter-button"
+                        type="button"
+                        aria-pressed="false"
+                        title="Show favorites only (F)"
+                    >★ Favorites</button>
+                </div>
+            </div>
+
+            <ul id="channel-list" class="channel-list" aria-label="Channel list"></ul>
+            <p id="status" class="status" role="status" aria-live="polite">Loading channels...</p>
+        </aside>
+
+        <main class="player-panel">
+            <header class="player-header">
+                <div class="now-playing">
+                    <img id="current-logo" class="current-logo" alt="" hidden>
+                    <div class="now-playing-text">
+                        <span class="player-kicker"><i aria-hidden="true"></i> Now playing</span>
+                        <h1 id="current-channel" aria-live="polite">Select a channel</h1>
+                        <p id="current-group" class="current-group">Choose a station from the list</p>
+                    </div>
+                </div>
+
+                <div class="player-actions" aria-label="Player controls">
+                    <button id="prev-channel" class="icon-button" type="button" title="Previous channel (K)" aria-label="Previous channel">‹</button>
+                    <button id="next-channel" class="icon-button" type="button" title="Next channel (J)" aria-label="Next channel">›</button>
+                    <button id="shuffle-channel" class="icon-button" type="button" title="Shuffle (S)" aria-label="Shuffle channels">⤨</button>
+                    <button id="favorite-channel" class="icon-button" type="button" title="Toggle favorite (F)" aria-label="Toggle favorite" aria-pressed="false">☆</button>
+                    <button id="refresh-channels" class="icon-button" type="button" title="Refresh list (R)" aria-label="Refresh channel list">⟳</button>
+                    <button id="fullscreen" class="icon-button" type="button" title="Fullscreen (Enter)" aria-label="Toggle fullscreen">⛶</button>
+                </div>
+            </header>
+
+            <div id="video-wrapper" class="video-wrapper">
+                <video id="video-player" controls playsinline preload="metadata"></video>
+                <div class="video-badge" aria-hidden="true"><span class="live-dot"></span> ESINU LIVE</div>
+                <div id="video-overlay" class="video-overlay" role="status">
+                    <div class="overlay-spinner" aria-hidden="true"></div>
+                    <p id="overlay-text">Loading channels...</p>
+                    <button id="retry-stream" class="overlay-button" type="button" hidden>Retry</button>
+                </div>
+            </div>
+
+            <footer class="player-footer">
+                <span id="stream-info">No stream selected</span>
+                <span class="shortcuts">/ search · J/K channels · F favorite · S shuffle · M mute</span>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            "use strict";
+
+            const byId = (id) => document.getElementById(id);
+            const els = {
+                list: byId("channel-list"),
+                search: byId("channel-search"),
+                clearSearch: byId("clear-search"),
+                countryFilter: byId("country-filter"),
+                groupFilter: byId("group-filter"),
+                ghanaFilter: byId("ghana-filter"),
+                favoritesFilter: byId("favorites-filter"),
+                count: byId("channel-count"),
+                status: byId("status"),
+                title: byId("current-channel"),
+                group: byId("current-group"),
+                logo: byId("current-logo"),
+                favorite: byId("favorite-channel"),
+                prev: byId("prev-channel"),
+                next: byId("next-channel"),
+                shuffle: byId("shuffle-channel"),
+                refresh: byId("refresh-channels"),
+                fullscreen: byId("fullscreen"),
+                wrapper: byId("video-wrapper"),
+                video: byId("video-player"),
+                overlay: byId("video-overlay"),
+                overlayText: byId("overlay-text"),
+                retry: byId("retry-stream"),
+                streamInfo: byId("stream-info"),
+            };
+
+            const FAVORITES_KEY = "esinu:favorites";
+
+            function loadFavorites() {
+                try {
+                    const stored = localStorage.getItem(FAVORITES_KEY)
+                        || localStorage.getItem("hls-player:favorites")
+                        || "[]";
+                    const parsed = JSON.parse(stored);
+                    return new Set(Array.isArray(parsed) ? parsed : []);
+                } catch (_) {
+                    return new Set();
+                }
+            }
+
+            const state = {
+                channels: [],
+                visible: [],
+                selected: null,
+                favorites: loadFavorites(),
+                favoritesOnly: false,
+                ghanaOnly: false,
+                country: "",
+                group: "",
+                search: "",
+                hls: null,
+                overlayRetry: null,
+                loading: false,
+                searchTimer: null,
+                retryTimer: null,
+                networkRetries: 0,
+            };
+
+            function channelKey(channel) {
+                return channel?.url || channel?.name || "";
+            }
+
+            function isFavorite(channel) {
+                return state.favorites.has(channelKey(channel));
+            }
+
+            function syncSelectValue(select, key) {
+                const options = [...select.options].map((option) => option.value);
+                if (!options.includes(state[key])) state[key] = "";
+                select.value = state[key];
+            }
+
+            function persistFavorites() {
+                try {
+                    localStorage.setItem(
+                        FAVORITES_KEY,
+                        JSON.stringify([...state.favorites])
+                    );
+                } catch (_) {
+                    // Storage may be disabled; favorites still work for this session.
+                }
+            }
+
+            function setStatus(message) {
+                els.status.textContent = message;
+            }
+
+            function setOverlay(mode, message, retryAction = null) {
+                els.overlay.className = `video-overlay is-visible${mode ? ` ${mode}` : ""}`;
+                els.overlayText.textContent = message;
+                els.retry.hidden = !retryAction;
+                state.overlayRetry = retryAction;
+            }
+
+            function hideOverlay() {
+                els.overlay.className = "video-overlay";
+                els.overlayText.textContent = "";
+                els.retry.hidden = true;
+                state.overlayRetry = null;
+            }
+
+            function updateStatus() {
+                const total = state.channels.length;
+                const shown = state.visible.length;
+                const keys = new Set(state.channels.map(channelKey));
+                const favorites = [...state.favorites].filter((key) => keys.has(key)).length;
+                els.count.textContent = String(total);
+                els.status.textContent =
+                    `${total} channel${total === 1 ? "" : "s"} · ` +
+                    `${shown} shown · ` +
+                    `${favorites} favorite${favorites === 1 ? "" : "s"}`;
+            }
+
+            function populateGroups() {
+                const groups = [
+                    ...new Set(state.channels.map((channel) => channel.group).filter(Boolean)),
+                ].sort();
+
+                els.groupFilter.replaceChildren();
+
+                const all = document.createElement("option");
+                all.value = "";
+                all.textContent = "All groups";
+                els.groupFilter.appendChild(all);
+
+                groups.forEach((group) => {
+                    const option = document.createElement("option");
+                    option.value = String(group);
+                    option.textContent = String(group);
+                    els.groupFilter.appendChild(option);
+                });
+
+                syncSelectValue(els.groupFilter, "group");
+            }
+
+            function populateCountries() {
+                const countries = [
+                    ...new Set(
+                        state.channels.map((channel) => channel.country || "Uncategorized")
+                    ),
+                ].sort((a, b) => a.localeCompare(b));
+
+                els.countryFilter.replaceChildren();
+
+                const all = document.createElement("option");
+                all.value = "";
+                all.textContent = "All countries";
+                els.countryFilter.appendChild(all);
+
+                countries.forEach((country) => {
+                    const option = document.createElement("option");
+                    option.value = String(country);
+                    option.textContent = String(country);
+                    els.countryFilter.appendChild(option);
+                });
+
+                syncSelectValue(els.countryFilter, "country");
+            }
+
+            function computeVisible() {
+                const term = state.search.trim().toLowerCase();
+                state.visible = state.channels.filter((channel) => {
+                    if (state.favoritesOnly && !isFavorite(channel)) return false;
+                    if (state.ghanaOnly && channel.country !== "Ghana") return false;
+                    if (state.country && (channel.country || "Uncategorized") !== state.country) return false;
+                    if (state.group && channel.group !== state.group) return false;
+                    if (term) {
+                        const haystack = `${channel.name || ""} ${channel.group || ""} ${channel.country || ""}`.toLowerCase();
+                        if (!haystack.includes(term)) return false;
+                    }
+                    return true;
+                });
+            }
+
+            function renderChannels(options = {}) {
+                computeVisible();
+                const fragment = document.createDocumentFragment();
+
+                if (state.visible.length === 0) {
+                    const empty = document.createElement("li");
+                    empty.className = "channel-empty";
+                    empty.textContent = state.channels.length
+                        ? "No channels match these filters."
+                        : "No channels available.";
+                    fragment.appendChild(empty);
+                } else {
+                    let lastCountry = null;
+                    state.visible.forEach((channel) => {
+                        const country = channel.country || "Uncategorized";
+                        if (country !== lastCountry) {
+                            const heading = document.createElement("li");
+                            heading.className = "country-heading";
+                            heading.textContent = country;
+                            fragment.appendChild(heading);
+                            lastCountry = country;
+                        }
+
+                        const item = document.createElement("li");
+                        const button = document.createElement("button");
+                        const active = Boolean(
+                            state.selected &&
+                            channelKey(state.selected) === channelKey(channel)
+                        );
+
+                        button.type = "button";
+                        button.className = `channel-button${active ? " active" : ""}`;
+                        button.dataset.key = channelKey(channel);
+                        button.setAttribute("aria-pressed", String(active));
+
+                        const dot = document.createElement("span");
+                        dot.className = "channel-dot";
+
+                        const body = document.createElement("span");
+                        body.className = "channel-body";
+
+                        const name = document.createElement("span");
+                        name.className = "channel-name";
+                        name.textContent = channel.name || "Untitled channel";
+
+                        const meta = document.createElement("span");
+                        meta.className = "channel-meta";
+
+                        if (channel.group) {
+                            const badge = document.createElement("span");
+                            badge.className = "group-badge";
+                            badge.textContent = channel.group;
+                            meta.appendChild(badge);
+                        }
+
+                        const favouriteMark = document.createElement("span");
+                        favouriteMark.className =
+                            `fav-mark${isFavorite(channel) ? " active" : ""}`;
+                        favouriteMark.textContent = "★";
+                        meta.appendChild(favouriteMark);
+
+                        body.append(name, meta);
+                        button.append(dot, body);
+                        item.appendChild(button);
+                        fragment.appendChild(item);
+                    });
+                }
+
+                els.list.replaceChildren(fragment);
+                if (options.resetScroll) els.list.scrollTop = 0;
+                updateStatus();
+            }
+
+            function updateLogo(channel) {
+                const logo = channel?.logo;
+                if (!logo) {
+                    els.logo.hidden = true;
+                    els.logo.removeAttribute("src");
+                    return;
+                }
+
+                els.logo.hidden = false;
+                els.logo.onerror = () => {
+                    els.logo.hidden = true;
+                    els.logo.removeAttribute("src");
+                };
+                // Some image CDNs block hotlinked images when a Referer is sent.
+                els.logo.referrerPolicy = "no-referrer";
+                els.logo.src = logo;
+            }
+
+            function updateFavoriteButton() {
+                const active = state.selected ? isFavorite(state.selected) : false;
+                els.favorite.textContent = active ? "★" : "☆";
+                els.favorite.classList.toggle("is-favorite", active);
+                els.favorite.setAttribute("aria-pressed", String(active));
+            }
+
+            function destroyHls() {
+                clearTimeout(state.retryTimer);
+                state.retryTimer = null;
+                state.networkRetries = 0;
+                if (state.hls) {
+                    state.hls.destroy();
+                    state.hls = null;
+                }
+            }
+
+            function playStream(channel) {
+                const url = channel?.url;
+                destroyHls();
+                els.video.pause();
+                els.video.removeAttribute("src");
+                els.video.load();
+
+                if (!url) {
+                    els.streamInfo.textContent = "No stream selected";
+                    setOverlay("idle", "No stream URL is available for this channel.");
+                    return;
+                }
+
+                els.streamInfo.textContent = "Connecting...";
+                setOverlay("loading", "Connecting to stream...", () => playStream(channel));
+
+                if (els.video.canPlayType("application/vnd.apple.mpegurl")) {
+                    // Safari and other browsers with native HLS support.
+                    els.video.src = url;
+                    els.video.play().catch(() => {
+                        setOverlay("idle", "Tap play to start this channel.");
+                    });
+                    return;
+                }
+
+                if (window.Hls && Hls.isSupported()) {
+                    // Chrome, Firefox, Edge, etc. need hls.js for .m3u8 playback.
+                    const instance = new Hls({
+                        enableWorker: true,
+                        lowLatencyMode: false,
+                        backBufferLength: 30,
+                    });
+                    state.hls = instance;
+
+                    instance.on(Hls.Events.MEDIA_ATTACHED, () => instance.loadSource(url));
+
+                    instance.on(Hls.Events.MANIFEST_PARSED, () => {
+                        if (state.hls !== instance) return;
+                        els.streamInfo.textContent = "Stream ready";
+                        hideOverlay();
+                        els.video.play().catch(() => {
+                            setOverlay("idle", "Tap play to start this channel.");
+                        });
+                    });
+
+                    instance.on(Hls.Events.ERROR, (_event, data) => {
+                        if (!data.fatal || state.hls !== instance) return;
+                        const types = Hls.ErrorTypes || {};
+
+                        if (data.type === types.NETWORK_ERROR) {
+                            const maxRetries = 3;
+                            if (state.networkRetries >= maxRetries) {
+                                setOverlay(
+                                    "error",
+                                    "Network error. Check the connection and tap Retry.",
+                                    () => playStream(channel)
+                                );
+                                destroyHls();
+                                return;
+                            }
+                            state.networkRetries += 1;
+                            const delay = 500 * (2 ** (state.networkRetries - 1));
+                            clearTimeout(state.retryTimer);
+                            setOverlay(
+                                "loading",
+                                `Network error - retrying ${state.networkRetries}/${maxRetries}...`
+                            );
+                            state.retryTimer = setTimeout(() => {
+                                if (state.hls === instance) instance.startLoad();
+                            }, delay);
+                        } else if (data.type === types.MEDIA_ERROR) {
+                            setOverlay("error", "Media error - recovering...", () => instance.recoverMediaError());
+                            instance.recoverMediaError();
+                        } else {
+                            setOverlay("error", "This stream could not be played.", () => playStream(channel));
+                            destroyHls();
+                        }
+                    });
+
+                    instance.attachMedia(els.video);
+                    return;
+                }
+
+                const message = window.Hls
+                    ? "hls.js is loaded but HLS is not supported in this browser."
+                    : "hls.js could not be loaded and this browser has no native HLS support.";
+                setOverlay("error", message);
+            }
+
+            function updateActiveChannel(channel) {
+                const key = channelKey(channel);
+                els.list.querySelectorAll(".channel-button").forEach((button) => {
+                    const active = button.dataset.key === key;
+                    button.classList.toggle("active", active);
+                    button.setAttribute("aria-pressed", String(active));
+                });
+
+                const activeButton = els.list.querySelector(".channel-button.active");
+                if (activeButton && typeof activeButton.scrollIntoView === "function") {
+                    activeButton.scrollIntoView({ block: "nearest" });
+                }
+            }
+
+            function selectChannel(channel) {
+                if (!channel) return;
+                state.selected = channel;
+                els.title.textContent = channel.name || "Untitled channel";
+                els.group.textContent = channel.group
+                    ? `Group · ${channel.group}`
+                    : "Public stream";
+                updateLogo(channel);
+                updateFavoriteButton();
+                updateActiveChannel(channel);
+                playStream(channel);
+            }
+
+            function step(delta) {
+                const list = state.visible.length ? state.visible : state.channels;
+                if (list.length === 0) return;
+
+                const currentIndex = list.findIndex(
+                    (channel) => channelKey(channel) === channelKey(state.selected)
+                );
+                const nextIndex =
+                    currentIndex < 0 ? 0 : (currentIndex + delta + list.length) % list.length;
+                selectChannel(list[nextIndex]);
+            }
+
+            function shuffleChannel() {
+                const list = state.visible.length ? state.visible : state.channels;
+                const pool = list.filter(
+                    (channel) => channelKey(channel) !== channelKey(state.selected)
+                );
+                if (pool.length === 0) return;
+                selectChannel(pool[Math.floor(Math.random() * pool.length)]);
+            }
+
+            function toggleFavorite() {
+                if (!state.selected) return;
+                const key = channelKey(state.selected);
+                if (state.favorites.has(key)) {
+                    state.favorites.delete(key);
+                } else {
+                    state.favorites.add(key);
+                }
+                persistFavorites();
+                updateFavoriteButton();
+                renderChannels({ resetScroll: true });
+            }
+
+            function toggleFullscreen() {
+                const request =
+                    els.wrapper.requestFullscreen || els.wrapper.webkitRequestFullscreen;
+                const exit = document.exitFullscreen || document.webkitExitFullscreen;
+
+                try {
+                    if (document.fullscreenElement || document.webkitFullscreenElement) {
+                        if (exit) exit.call(document);
+                    } else if (request) {
+                        request.call(els.wrapper);
+                    }
+                } catch (_) {
+                    // Fullscreen can be blocked by browser policy; ignore it.
+                }
+            }
+
+            async function loadChannels(force = false) {
+                if (state.loading) return;
+                state.loading = true;
+                const previousKey = state.selected ? channelKey(state.selected) : "";
+                els.list.classList.add("is-loading");
+                els.refresh.classList.add("is-spinning");
+                els.refresh.disabled = true;
+                setOverlay("loading", force ? "Refreshing channel list..." : "Loading channels...");
+
+                try {
+                    const endpoint = force ? "/api/channels?refresh=1" : "/api/channels";
+                    const response = await fetch(endpoint, { cache: "no-store" });
+                    const payload = await response.json().catch(() => null);
+
+                    if (!response.ok) {
+                        throw new Error((payload && payload.error) || `HTTP ${response.status}`);
+                    }
+                    if (!Array.isArray(payload)) {
+                        throw new Error("Unexpected response from server");
+                    }
+
+                    const seen = new Set();
+                    state.channels = payload.filter((channel) => {
+                        if (!channel || typeof channel !== "object") return false;
+                        const key = channelKey(channel);
+                        if (!key || seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                    });
+
+                    populateCountries();
+                    populateGroups();
+                    renderChannels();
+
+                    const preserved = state.channels.find(
+                        (channel) => channelKey(channel) === previousKey
+                    );
+                    if (preserved) {
+                        selectChannel(preserved);
+                    } else if (state.channels.length) {
+                        selectChannel(state.channels[0]);
+                    } else {
+                        setOverlay("idle", "No channels are available in this playlist.");
+                    }
+                } catch (error) {
+                    setStatus(`Could not load channels: ${error.message}`);
+                    setOverlay("error", "Channel list unavailable.", () => loadChannels(true));
+                } finally {
+                    els.list.classList.remove("is-loading");
+                    els.refresh.classList.remove("is-spinning");
+                    els.refresh.disabled = false;
+                    state.loading = false;
+                }
+            }
+
+            els.list.addEventListener("click", (event) => {
+                const button = event.target.closest(".channel-button");
+                if (!button) return;
+                const channel = state.channels.find(
+                    (candidate) => channelKey(candidate) === button.dataset.key
+                );
+                if (channel) selectChannel(channel);
+            });
+
+            els.search.addEventListener("input", (event) => {
+                const value = event.target.value;
+                els.clearSearch.hidden = value.length === 0;
+                clearTimeout(state.searchTimer);
+                state.searchTimer = setTimeout(() => {
+                    state.search = value;
+                    renderChannels({ resetScroll: true });
+                }, 150);
+            });
+
+            els.clearSearch.addEventListener("click", () => {
+                clearTimeout(state.searchTimer);
+                els.search.value = "";
+                state.search = "";
+                els.clearSearch.hidden = true;
+                els.search.focus();
+                renderChannels({ resetScroll: true });
+            });
+
+            els.countryFilter.addEventListener("change", (event) => {
+                state.country = event.target.value;
+                renderChannels({ resetScroll: true });
+            });
+
+            els.groupFilter.addEventListener("change", (event) => {
+                state.group = event.target.value;
+                renderChannels({ resetScroll: true });
+            });
+
+            els.ghanaFilter.addEventListener("click", () => {
+                state.ghanaOnly = !state.ghanaOnly;
+                if (state.ghanaOnly) {
+                    state.country = "";
+                    state.group = "";
+                    els.countryFilter.value = "";
+                    els.groupFilter.value = "";
+                }
+                els.ghanaFilter.setAttribute("aria-pressed", String(state.ghanaOnly));
+                els.ghanaFilter.classList.toggle("is-active", state.ghanaOnly);
+                renderChannels({ resetScroll: true });
+            });
+
+            els.favoritesFilter.addEventListener("click", () => {
+                state.favoritesOnly = !state.favoritesOnly;
+                els.favoritesFilter.setAttribute("aria-pressed", String(state.favoritesOnly));
+                els.favoritesFilter.classList.toggle("is-active", state.favoritesOnly);
+                renderChannels({ resetScroll: true });
+            });
+
+            els.prev.addEventListener("click", () => step(-1));
+            els.next.addEventListener("click", () => step(1));
+            els.shuffle.addEventListener("click", shuffleChannel);
+            els.favorite.addEventListener("click", toggleFavorite);
+            els.refresh.addEventListener("click", () => loadChannels(true));
+            els.fullscreen.addEventListener("click", toggleFullscreen);
+
+            els.retry.addEventListener("click", () => {
+                if (typeof state.overlayRetry === "function") state.overlayRetry();
+            });
+
+            document.addEventListener("keydown", (event) => {
+                const target = event.target instanceof Element ? event.target : null;
+                const typing = Boolean(
+                    target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)
+                );
+                const interactive = Boolean(
+                    target && target.closest("button, a, [role=button]")
+                );
+
+                if (event.key === "/" && !typing) {
+                    event.preventDefault();
+                    els.search.focus();
+                    return;
+                }
+                if (typing || interactive || event.metaKey || event.ctrlKey || event.altKey) return;
+
+                switch (event.key.toLowerCase()) {
+                    case "j": step(1); break;
+                    case "k": step(-1); break;
+                    case "f": toggleFavorite(); break;
+                    case "s": shuffleChannel(); break;
+                    case "r": loadChannels(true); break;
+                    case "m": els.video.muted = !els.video.muted; break;
+                    case "enter": toggleFullscreen(); break;
+                    default: break;
+                }
+            });
+
+            function markPlaying() {
+                hideOverlay();
+                els.streamInfo.textContent = `Playing · ${state.selected?.name || "stream"}`;
+            }
+
+            els.video.addEventListener("loadedmetadata", markPlaying);
+            els.video.addEventListener("canplay", markPlaying);
+            els.video.addEventListener("playing", markPlaying);
+            els.video.addEventListener("waiting", () => {
+                els.streamInfo.textContent = "Buffering...";
+                setOverlay("loading", "Buffering...");
+            });
+            els.video.addEventListener("error", () => {
+                els.streamInfo.textContent = "Stream unavailable";
+                setOverlay("error", "The stream could not be loaded.", () => {
+                    if (state.selected) playStream(state.selected);
+                });
+            });
+
+            window.addEventListener("beforeunload", destroyHls);
+
+            if ("serviceWorker" in navigator && window.isSecureContext) {
+                navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+            }
+
+            loadChannels();
+        });
+    </script>
+</body>
+</html>

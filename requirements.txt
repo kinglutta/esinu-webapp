@@ -1,0 +1,3 @@
+# Web framework and HTTP client used by app.py
+Flask>=3.0,<4
+requests>=2.31,<3
