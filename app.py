@@ -25,6 +25,34 @@ USER_AGENT = os.getenv(
     "PLAYLIST_USER_AGENT", "Mozilla/5.0 (compatible; ESINU/1.0)"
 )
 
+# 7reels exposes a TMDB-backed catalog API. We proxy metadata only; movies are
+# played on 7reels itself so ESINU never embeds an unlicensed stream.
+REELS_BASE_URL = os.getenv("REELS_BASE_URL", "https://7reels.cc").rstrip("/")
+MOVIE_TIMEOUT = float(os.getenv("MOVIE_TIMEOUT", "15"))
+MOVIE_LANGUAGE = os.getenv("MOVIE_LANGUAGE", "en-US")
+
+GENRE_NAMES = {
+    28: "Action",
+    12: "Adventure",
+    16: "Animation",
+    35: "Comedy",
+    80: "Crime",
+    99: "Documentary",
+    18: "Drama",
+    10751: "Family",
+    14: "Fantasy",
+    36: "History",
+    27: "Horror",
+    10402: "Music",
+    9648: "Mystery",
+    10749: "Romance",
+    878: "Science Fiction",
+    10770: "TV Movie",
+    53: "Thriller",
+    10752: "War",
+    37: "Western",
+}
+
 # Curated free-to-air Ghanaian streams from LiveGhanaTV and the iptv-org Ghana
 # list. The LiveGhanaTV CDNs require a Referer header, so the app proxies all
 # curated streams locally. Use only streams you are legally permitted to watch.
@@ -358,6 +386,219 @@ def _api_error(message: str, status_code: int):
     return jsonify({"error": message}), status_code
 
 
+def _safe_int(value, default=None):
+    """Convert API values to integers without letting bad data crash a route."""
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _image_url(path, size: str = "w500") -> str | None:
+    """Turn a TMDB image path into a browser-ready URL."""
+    if not isinstance(path, str) or not path.strip():
+        return None
+    value = path.strip()
+    if value.startswith(("http://", "https://")):
+        return value
+    if not value.startswith("/"):
+        value = "/" + value
+    return f"https://image.tmdb.org/t/p/{size}{value}"
+
+
+def _normalize_movie(item) -> dict | None:
+    """Convert a 7reels/TMDB movie record into the shape the UI expects."""
+    if not isinstance(item, dict):
+        return None
+    if str(item.get("media_type") or "movie").lower() != "movie":
+        return None
+    if item.get("adult") or item.get("softcore"):
+        return None
+
+    movie_id = _safe_int(item.get("id"))
+    title = item.get("title") or item.get("original_title") or item.get("name")
+    if not movie_id or not isinstance(title, str) or not title.strip():
+        return None
+
+    release_date = str(
+        item.get("release_date") or item.get("first_air_date") or ""
+    ).strip()
+
+    try:
+        raw_rating = item.get("vote_average")
+        rating = round(float(raw_rating), 1) if raw_rating not in (None, "") else None
+    except (TypeError, ValueError):
+        rating = None
+
+    genre_ids: list[int] = []
+    raw_genres = item.get("genres") if isinstance(item.get("genres"), list) else []
+    for genre in raw_genres:
+        if not isinstance(genre, dict):
+            continue
+        genre_id = _safe_int(genre.get("id"))
+        if genre_id and genre_id not in genre_ids:
+            genre_ids.append(genre_id)
+    if not genre_ids:
+        raw_ids = item.get("genre_ids")
+        if isinstance(raw_ids, list):
+            for value in raw_ids:
+                genre_id = _safe_int(value)
+                if genre_id and genre_id not in genre_ids:
+                    genre_ids.append(genre_id)
+
+    genres: list[str] = []
+    for genre in raw_genres:
+        if isinstance(genre, dict) and isinstance(genre.get("name"), str):
+            name = genre["name"].strip()
+            if name and name not in genres:
+                genres.append(name)
+    for genre_id in genre_ids:
+        name = GENRE_NAMES.get(genre_id)
+        if name and name not in genres:
+            genres.append(name)
+
+    overview = item.get("overview")
+    if not isinstance(overview, str) or not overview.strip():
+        overview = "No synopsis is available for this movie yet."
+
+    return {
+        "id": movie_id,
+        "title": title.strip(),
+        "originalTitle": item.get("original_title") or item.get("original_name") or title,
+        "overview": overview.strip(),
+        "poster": _image_url(item.get("poster_path"), "w500"),
+        "backdrop": _image_url(item.get("backdrop_path"), "w780"),
+        "year": release_date[:4] or None,
+        "releaseDate": release_date or None,
+        "rating": rating,
+        "voteCount": _safe_int(item.get("vote_count"), 0),
+        "genreIds": genre_ids,
+        "genres": genres[:3],
+        "watchUrl": f"{REELS_BASE_URL}/movie/{movie_id}/watch",
+    }
+
+
+def _normalize_movie_detail(data: dict) -> dict | None:
+    """Add credits and runtime to a normalized movie record."""
+    movie = _normalize_movie(data)
+    if movie is None:
+        return None
+
+    credits = data.get("credits") if isinstance(data.get("credits"), dict) else {}
+    crew = credits.get("crew") if isinstance(credits.get("crew"), list) else []
+    cast = credits.get("cast") if isinstance(credits.get("cast"), list) else []
+
+    director = next(
+        (
+            person.get("name")
+            for person in crew
+            if isinstance(person, dict)
+            and person.get("job") == "Director"
+            and person.get("name")
+        ),
+        None,
+    )
+    cast_names = [
+        person["name"].strip()
+        for person in cast
+        if isinstance(person, dict)
+        and isinstance(person.get("name"), str)
+        and person["name"].strip()
+    ][:8]
+
+    tagline = data.get("tagline")
+    movie.update(
+        {
+            "director": director,
+            "cast": cast_names,
+            "runtime": _safe_int(data.get("runtime")),
+            "tagline": tagline.strip() if isinstance(tagline, str) else "",
+            "imdbId": data.get("imdb_id") if isinstance(data.get("imdb_id"), str) else None,
+        }
+    )
+    return movie
+
+
+def _fetch_reels_json(path: str, params: dict | None = None) -> dict:
+    """Fetch JSON from 7reels with browser-like headers and a bounded timeout."""
+    if not path.startswith("/api/"):
+        path = "/api/" + path.lstrip("/")
+    response = requests.get(
+        f"{REELS_BASE_URL}{path}",
+        params=params or {},
+        timeout=(5, MOVIE_TIMEOUT),
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
+            "Referer": f"{REELS_BASE_URL}/",
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("Unexpected response from 7reels")
+    return payload
+
+
+MOVIE_SECTIONS = {
+    "trending": (
+        "/api/tmdb/trending/movie/week",
+        {"language": MOVIE_LANGUAGE, "include_adult": "false"},
+    ),
+    "popular": (
+        "/api/tmdb/movie/popular",
+        {"language": MOVIE_LANGUAGE, "include_adult": "false"},
+    ),
+    "top-rated": (
+        "/api/tmdb/movie/top_rated",
+        {"language": MOVIE_LANGUAGE, "include_adult": "false"},
+    ),
+    "now-playing": (
+        "/api/tmdb/movie/now_playing",
+        {"language": MOVIE_LANGUAGE, "include_adult": "false"},
+    ),
+    "discover": (
+        "/api/tmdb/discover/movie",
+        {
+            "language": MOVIE_LANGUAGE,
+            "include_adult": "false",
+            "sort_by": "popularity.desc",
+        },
+    ),
+}
+
+
+def _movie_list_payload(
+    data: dict, section: str, page: int, query: str = ""
+) -> Response:
+    """Build the JSON response for a movie list endpoint."""
+    raw_results = data.get("results")
+    if not isinstance(raw_results, list):
+        raw_results = data.get("items") if isinstance(data.get("items"), list) else []
+
+    results = []
+    for item in raw_results:
+        movie = _normalize_movie(item)
+        if movie is not None:
+            results.append(movie)
+
+    return jsonify(
+        {
+            "section": section,
+            "query": query,
+            "page": max(1, _safe_int(data.get("page"), page) or page),
+            "totalPages": max(1, _safe_int(data.get("total_pages"), 1) or 1),
+            "totalResults": max(
+                len(results), _safe_int(data.get("total_results"), 0) or 0
+            ),
+            "results": results,
+            "source": REELS_BASE_URL,
+        }
+    )
+
+
 def _is_allowed_upstream(target: str, stream: dict) -> bool:
     """Prevent the proxy from being used as an open URL fetcher."""
     parsed_target = urlparse(target)
@@ -456,8 +697,97 @@ def api_health():
             "status": "ok",
             "playlist_present": present,
             "channel_count": count,
+            "movie_source": REELS_BASE_URL,
         }
     )
+
+
+@app.get("/api/movies")
+def api_movies():
+    """Return movie listings from 7reels' TMDB-backed catalog API."""
+    section = request.args.get("section", "trending").strip().lower() or "trending"
+    page = max(1, min(_safe_int(request.args.get("page"), 1) or 1, 20))
+    query = request.args.get("q", "").strip()
+    genre = _safe_int(request.args.get("genre"))
+
+    try:
+        if section == "search":
+            if not query:
+                return _movie_list_payload({}, section, page, query)
+            data = _fetch_reels_json(
+                "/api/search/smart",
+                {"q": query, "page": page, "language": MOVIE_LANGUAGE},
+            )
+            return _movie_list_payload(data, section, page, query)
+
+        if section == "genre":
+            if not genre:
+                return _api_error("A genre id is required", 400)
+            path, params = MOVIE_SECTIONS["discover"]
+            params = dict(params)
+            params.update({"page": page, "with_genres": genre})
+            data = _fetch_reels_json(path, params)
+            return _movie_list_payload(data, section, page)
+
+        if section not in MOVIE_SECTIONS:
+            return _api_error("Unknown movie section", 400)
+
+        path, params = MOVIE_SECTIONS[section]
+        params = dict(params)
+        params["page"] = page
+        data = _fetch_reels_json(path, params)
+        return _movie_list_payload(data, section, page)
+    except requests.RequestException as exc:
+        return _api_error(f"Could not reach 7reels: {exc}", 502)
+    except (ValueError, TypeError) as exc:
+        return _api_error(str(exc), 500)
+
+
+@app.get("/api/movies/genres")
+def api_movie_genres():
+    """Return movie genres, with a local fallback if 7reels is unreachable."""
+    data: dict = {}
+    try:
+        data = _fetch_reels_json(
+            "/api/tmdb/genre/movie/list", {"language": MOVIE_LANGUAGE}
+        )
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        log.warning("Using local movie genre fallback: %s", exc)
+
+    genres = []
+    raw_genres = data.get("genres") if isinstance(data.get("genres"), list) else []
+    for item in raw_genres:
+        if not isinstance(item, dict):
+            continue
+        genre_id = _safe_int(item.get("id"))
+        name = item.get("name")
+        if genre_id and isinstance(name, str) and name.strip():
+            genres.append({"id": genre_id, "name": name.strip()})
+
+    if not genres:
+        genres = [
+            {"id": genre_id, "name": name} for genre_id, name in GENRE_NAMES.items()
+        ]
+    return jsonify(genres)
+
+
+@app.get("/api/movies/<int:movie_id>")
+def api_movie_detail(movie_id: int):
+    """Return details and credits for one 7reels movie."""
+    try:
+        data = _fetch_reels_json(
+            f"/api/tmdb/movie/{movie_id}",
+            {"language": MOVIE_LANGUAGE, "append_to_response": "credits"},
+        )
+    except requests.RequestException as exc:
+        return _api_error(f"Could not reach 7reels: {exc}", 502)
+    except (ValueError, TypeError) as exc:
+        return _api_error(str(exc), 500)
+
+    movie = _normalize_movie_detail(data)
+    if movie is None:
+        return _api_error("Movie not found", 404)
+    return jsonify(movie)
 
 
 @app.get("/stream/<channel_id>")

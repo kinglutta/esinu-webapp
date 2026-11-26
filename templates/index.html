@@ -13,7 +13,33 @@
     <script src="{{ url_for('static', filename='hls.min.js') }}" defer></script>
 </head>
 <body>
-    <div class="app">
+    <header class="topbar">
+        <nav class="view-tabs" aria-label="Main views">
+            <button
+                id="view-live"
+                class="view-tab is-active"
+                type="button"
+                aria-pressed="true"
+                aria-controls="live-view"
+            >📺 Live TV</button>
+            <button
+                id="view-movies"
+                class="view-tab"
+                type="button"
+                aria-pressed="false"
+                aria-controls="movies-view"
+            >🎬 Movies</button>
+        </nav>
+        <a
+            class="source-link"
+            href="https://7reels.cc"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open 7reels in a new tab"
+        >Movie data by 7reels ↗</a>
+    </header>
+
+    <div id="live-view" class="app">
         <aside class="sidebar" aria-label="ESINU channel browser">
             <div class="sidebar-header">
                 <div class="brand">
@@ -113,6 +139,99 @@
                 <span class="shortcuts">/ search · J/K channels · F favorite · S shuffle · M mute</span>
             </footer>
         </main>
+    </div>
+
+    <section id="movies-view" class="movies-view" aria-label="Movie browser" hidden>
+        <div class="movies-toolbar">
+            <div class="movies-heading">
+                <span class="movies-kicker">7reels catalog</span>
+                <h1>Discover movies</h1>
+                <p>Browse titles from 7reels. Playback opens safely on 7reels.</p>
+            </div>
+            <div class="movie-search-wrap">
+                <span class="movie-search-icon" aria-hidden="true">⌕</span>
+                <input
+                    type="search"
+                    id="movie-search"
+                    placeholder="Search movies..."
+                    autocomplete="off"
+                    aria-label="Search movies"
+                >
+                <button
+                    id="movie-search-clear"
+                    class="icon-button clear-search"
+                    type="button"
+                    aria-label="Clear movie search"
+                    title="Clear search"
+                    hidden
+                >×</button>
+            </div>
+        </div>
+
+        <div id="movie-sections" class="movie-chip-row" aria-label="Movie categories">
+            <button class="movie-chip is-active" type="button" data-section="trending" aria-pressed="true">Trending</button>
+            <button class="movie-chip" type="button" data-section="popular" aria-pressed="false">Popular</button>
+            <button class="movie-chip" type="button" data-section="top-rated" aria-pressed="false">Top rated</button>
+            <button class="movie-chip" type="button" data-section="now-playing" aria-pressed="false">Now playing</button>
+            <button class="movie-chip" type="button" data-section="discover" aria-pressed="false">Discover</button>
+        </div>
+
+        <div id="movie-genres" class="movie-chip-row movie-genres" aria-label="Movie genres"></div>
+
+        <p id="movie-status" class="movie-status" role="status" aria-live="polite">Movies load when you open this tab.</p>
+        <div id="movie-grid" class="movie-grid" aria-live="polite"></div>
+
+        <div id="movie-pagination" class="movie-pagination" hidden>
+            <button id="movie-prev" class="icon-button" type="button" aria-label="Previous movie page" title="Previous page">‹</button>
+            <span id="movie-page-info">Page 1 of 1</span>
+            <button id="movie-next" class="icon-button" type="button" aria-label="Next movie page" title="Next page">›</button>
+            <button id="movie-retry" class="movie-retry" type="button" hidden>Retry</button>
+        </div>
+
+        <p class="movie-disclaimer">Movie metadata comes from 7reels and TMDB. ESINU does not host or embed movie streams.</p>
+    </section>
+
+    <div
+        id="movie-modal"
+        class="movie-modal"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="movie-detail-title"
+    >
+        <div class="movie-dialog">
+            <button
+                id="movie-modal-close"
+                class="movie-modal-close icon-button"
+                type="button"
+                aria-label="Close movie details"
+                title="Close (Esc)"
+            >×</button>
+            <div class="movie-dialog-poster">
+                <img id="movie-detail-poster" alt="" hidden>
+                <div id="movie-detail-placeholder" class="movie-poster-placeholder"><span>ESINU</span></div>
+            </div>
+            <div class="movie-dialog-body">
+                <span class="movies-kicker">Movie details</span>
+                <h2 id="movie-detail-title">Loading...</h2>
+                <p id="movie-detail-tagline" class="movie-tagline"></p>
+                <p id="movie-detail-meta" class="movie-detail-meta"></p>
+                <div id="movie-detail-genres" class="movie-detail-genres"></div>
+                <p id="movie-detail-overview" class="movie-detail-overview"></p>
+                <dl id="movie-detail-credits" class="movie-detail-credits"></dl>
+                <div class="movie-dialog-actions">
+                    <a
+                        id="movie-watch-link"
+                        class="movie-watch-link"
+                        href="https://7reels.cc"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >Watch on 7reels ↗</a>
+                    <button id="movie-modal-secondary" class="movie-secondary" type="button" hidden>Close</button>
+                </div>
+                <p id="movie-detail-status" class="movie-detail-status" role="status" aria-live="polite"></p>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -782,6 +901,11 @@
             });
 
             document.addEventListener("keydown", (event) => {
+                if (
+                    byId("movies-view")?.hidden === false ||
+                    byId("movie-modal")?.hidden === false
+                ) return;
+
                 const target = event.target instanceof Element ? event.target : null;
                 const typing = Boolean(
                     target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)
@@ -836,7 +960,461 @@
                 navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
             }
 
-            loadChannels();
+            window.esinuLoadChannels = loadChannels;
+            if (window.location.hash !== "#movies") loadChannels();
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            "use strict";
+
+            const byId = (id) => document.getElementById(id);
+            const els = {
+                live: byId("live-view"),
+                movies: byId("movies-view"),
+                liveTab: byId("view-live"),
+                moviesTab: byId("view-movies"),
+                search: byId("movie-search"),
+                clearSearch: byId("movie-search-clear"),
+                sections: byId("movie-sections"),
+                genres: byId("movie-genres"),
+                grid: byId("movie-grid"),
+                status: byId("movie-status"),
+                pagination: byId("movie-pagination"),
+                prev: byId("movie-prev"),
+                next: byId("movie-next"),
+                pageInfo: byId("movie-page-info"),
+                retry: byId("movie-retry"),
+                modal: byId("movie-modal"),
+                modalClose: byId("movie-modal-close"),
+                modalSecondary: byId("movie-modal-secondary"),
+                detailPoster: byId("movie-detail-poster"),
+                detailPlaceholder: byId("movie-detail-placeholder"),
+                detailTitle: byId("movie-detail-title"),
+                detailTagline: byId("movie-detail-tagline"),
+                detailMeta: byId("movie-detail-meta"),
+                detailGenres: byId("movie-detail-genres"),
+                detailOverview: byId("movie-detail-overview"),
+                detailCredits: byId("movie-detail-credits"),
+                detailStatus: byId("movie-detail-status"),
+                watchLink: byId("movie-watch-link"),
+            };
+
+            const SECTION_LABELS = {
+                trending: "Trending this week",
+                popular: "Popular movies",
+                "top-rated": "Top rated movies",
+                "now-playing": "Now playing",
+                discover: "Discover movies",
+                search: "Search results",
+                genre: "Movies by genre",
+            };
+
+            const state = {
+                view: window.location.hash === "#movies" ? "movies" : "live",
+                section: "trending",
+                genre: null,
+                query: "",
+                page: 1,
+                totalPages: 1,
+                loading: false,
+                requestId: 0,
+                genresLoaded: false,
+                searchTimer: null,
+            };
+
+            async function api(path) {
+                const response = await fetch(path, { cache: "no-store" });
+                const payload = await response.json().catch(() => null);
+                if (!response.ok) {
+                    throw new Error((payload && payload.error) || `HTTP ${response.status}`);
+                }
+                if (!payload) throw new Error("Unexpected response from server");
+                return payload;
+            }
+
+            function setView(view, updateHash = true) {
+                const moviesActive = view === "movies";
+                state.view = view;
+
+                els.movies.hidden = !moviesActive;
+                els.live.hidden = moviesActive;
+                els.moviesTab.classList.toggle("is-active", moviesActive);
+                els.liveTab.classList.toggle("is-active", !moviesActive);
+                els.moviesTab.setAttribute("aria-pressed", String(moviesActive));
+                els.liveTab.setAttribute("aria-pressed", String(!moviesActive));
+                document.title = moviesActive
+                    ? "ESINU — Movies"
+                    : "ESINU — Live Channel Guide";
+
+                if (updateHash) {
+                    window.history.replaceState(null, "", moviesActive ? "#movies" : "#live");
+                }
+
+                if (moviesActive) {
+                    byId("video-player")?.pause();
+                    if (!state.genresLoaded) loadGenres();
+                    if (!els.grid.children.length && !state.loading && els.retry.hidden) {
+                        loadMovies();
+                    }
+                } else if (!byId("channel-list").children.length) {
+                    window.esinuLoadChannels?.();
+                }
+            }
+
+            function setStatus(message, canRetry = false) {
+                els.status.textContent = message;
+                els.retry.hidden = !canRetry;
+            }
+
+            function makePlaceholder(title) {
+                const placeholder = document.createElement("div");
+                placeholder.className = "movie-poster-placeholder";
+                const initial = document.createElement("span");
+                initial.textContent = (title || "M").trim().charAt(0).toUpperCase() || "M";
+                placeholder.appendChild(initial);
+                return placeholder;
+            }
+
+            function createMovieCard(movie) {
+                const article = document.createElement("article");
+                article.className = "movie-card";
+
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "movie-card-button";
+                button.dataset.movieId = String(movie.id);
+                button.setAttribute("aria-label", `View details for ${movie.title}`);
+
+                const poster = document.createElement("div");
+                poster.className = "movie-poster";
+                if (movie.poster) {
+                    const image = document.createElement("img");
+                    image.src = movie.poster;
+                    image.alt = "";
+                    image.loading = "lazy";
+                    image.referrerPolicy = "no-referrer";
+                    image.onerror = () => {
+                        image.remove();
+                        poster.appendChild(makePlaceholder(movie.title));
+                    };
+                    poster.appendChild(image);
+                } else {
+                    poster.appendChild(makePlaceholder(movie.title));
+                }
+
+                const rating = Number(movie.rating);
+                if (rating > 0) {
+                    const badge = document.createElement("span");
+                    badge.className = "movie-rating";
+                    badge.textContent = `★ ${rating.toFixed(1)}`;
+                    poster.appendChild(badge);
+                }
+
+                const body = document.createElement("div");
+                body.className = "movie-card-body";
+                const title = document.createElement("h2");
+                title.className = "movie-card-title";
+                title.textContent = movie.title;
+                const meta = document.createElement("p");
+                meta.className = "movie-card-meta";
+                meta.textContent = [movie.year, (movie.genres || [])[0]]
+                    .filter(Boolean)
+                    .join(" · ") || "7reels";
+                body.append(title, meta);
+                button.append(poster, body);
+                article.appendChild(button);
+                return article;
+            }
+
+            function renderMovies(payload) {
+                const fragment = document.createDocumentFragment();
+                const movies = Array.isArray(payload.results) ? payload.results : [];
+
+                if (movies.length === 0) {
+                    const empty = document.createElement("p");
+                    empty.className = "movie-empty";
+                    empty.textContent = state.query
+                        ? `No movies found for “${state.query}”.`
+                        : "No movies are available in this list right now.";
+                    fragment.appendChild(empty);
+                } else {
+                    movies.forEach((movie) => {
+                        if (movie && movie.id) fragment.appendChild(createMovieCard(movie));
+                    });
+                }
+
+                els.grid.replaceChildren(fragment);
+            }
+
+            function updateChips() {
+                els.sections.querySelectorAll(".movie-chip").forEach((chip) => {
+                    const active = !state.query && !state.genre &&
+                        chip.dataset.section === state.section;
+                    chip.classList.toggle("is-active", active);
+                    chip.setAttribute("aria-pressed", String(active));
+                });
+
+                els.genres.querySelectorAll(".movie-chip").forEach((chip) => {
+                    const active = !state.query &&
+                        (chip.dataset.genre || "") === String(state.genre || "");
+                    chip.classList.toggle("is-active", active);
+                    chip.setAttribute("aria-pressed", String(active));
+                });
+            }
+
+            function updatePagination() {
+                els.pagination.hidden = false;
+                els.prev.disabled = state.page <= 1;
+                els.next.disabled = state.page >= state.totalPages;
+                els.pageInfo.textContent = `Page ${state.page} of ${state.totalPages}`;
+            }
+
+            async function loadMovies() {
+                const requestId = ++state.requestId;
+                state.loading = true;
+                els.grid.classList.add("is-loading");
+                setStatus("Loading movies from 7reels...", false);
+
+                try {
+                    const params = new URLSearchParams({
+                        section: state.section,
+                        page: String(state.page),
+                    });
+                    if (state.query) params.set("q", state.query);
+                    if (state.genre && !state.query) {
+                        params.set("genre", String(state.genre));
+                    }
+
+                    const payload = await api(`/api/movies?${params.toString()}`);
+                    if (requestId !== state.requestId) return;
+
+                    state.page = Number(payload.page) || 1;
+                    state.totalPages = Number(payload.totalPages) || 1;
+                    renderMovies(payload);
+                    updatePagination();
+
+                    const label = SECTION_LABELS[state.section] || "Movies";
+                    const title = state.genre
+                        ? `${label} · ${state.genreName || " genre"}`
+                        : state.query
+                            ? `${label} · “${state.query}”`
+                            : label;
+                    setStatus(
+                        `${title} · ${payload.totalResults || 0} titles · ${state.page}/${state.totalPages}`,
+                        false
+                    );
+                } catch (error) {
+                    if (requestId !== state.requestId) return;
+                    els.grid.replaceChildren();
+                    updatePagination();
+                    setStatus(`Could not load movies: ${error.message}`, true);
+                } finally {
+                    if (requestId === state.requestId) {
+                        state.loading = false;
+                        els.grid.classList.remove("is-loading");
+                    }
+                }
+            }
+
+            function resetAndLoad({
+                section,
+                genre = null,
+                genreName = "",
+                query = "",
+                page = 1,
+            }) {
+                state.section = section;
+                state.genre = genre;
+                state.genreName = genreName;
+                state.query = query;
+                state.page = page;
+                els.search.value = query;
+                els.clearSearch.hidden = query.length === 0;
+                updateChips();
+                loadMovies();
+            }
+
+            function addGenreChip(id, name) {
+                const chip = document.createElement("button");
+                chip.type = "button";
+                chip.className = "movie-chip";
+                chip.dataset.genre = String(id || "");
+                chip.dataset.name = name;
+                chip.textContent = name;
+                chip.setAttribute("aria-pressed", "false");
+                els.genres.appendChild(chip);
+            }
+
+            async function loadGenres() {
+                if (state.genresLoaded) return;
+                state.genresLoaded = true;
+                try {
+                    const genres = await api("/api/movies/genres");
+                    addGenreChip("", "All genres");
+                    (Array.isArray(genres) ? genres : []).forEach((genre) => {
+                        if (genre && genre.id && genre.name) {
+                            addGenreChip(genre.id, genre.name);
+                        }
+                    });
+                    updateChips();
+                } catch (error) {
+                    state.genresLoaded = false;
+                    console.warn("ESINU movie genres unavailable:", error);
+                }
+            }
+
+            function createCredit(label, value) {
+                const dt = document.createElement("dt");
+                dt.textContent = label;
+                const dd = document.createElement("dd");
+                dd.textContent = value || "—";
+                return [dt, dd];
+            }
+
+            async function openMovieDetails(movieId) {
+                if (!movieId) return;
+                els.modal.hidden = false;
+                document.body.classList.add("modal-open");
+                els.detailTitle.textContent = "Loading...";
+                els.detailTagline.textContent = "";
+                els.detailMeta.textContent = "";
+                els.detailGenres.replaceChildren();
+                els.detailOverview.textContent = "";
+                els.detailCredits.replaceChildren();
+                els.detailStatus.textContent = "Loading details from 7reels...";
+                els.detailPoster.hidden = true;
+                els.detailPlaceholder.hidden = false;
+                els.detailPlaceholder.replaceChildren(makePlaceholder("").firstChild);
+                els.watchLink.href = `https://7reels.cc/movie/${movieId}/watch`;
+
+                try {
+                    const movie = await api(`/api/movies/${movieId}`);
+                    els.detailTitle.textContent = movie.title;
+                    els.detailTagline.textContent = movie.tagline || "";
+                    els.detailMeta.textContent = [
+                        movie.year,
+                        movie.runtime ? `${movie.runtime} min` : null,
+                        Number(movie.rating) > 0 ? `★ ${Number(movie.rating).toFixed(1)}` : null,
+                    ].filter(Boolean).join(" · ");
+                    els.detailOverview.textContent = movie.overview || "";
+                    els.watchLink.href = movie.watchUrl || els.watchLink.href;
+
+                    (movie.genres || []).forEach((name) => {
+                        const badge = document.createElement("span");
+                        badge.className = "movie-detail-genre";
+                        badge.textContent = name;
+                        els.detailGenres.appendChild(badge);
+                    });
+
+                    const credits = document.createDocumentFragment();
+                    createCredit("Director", movie.director).forEach((node) => credits.appendChild(node));
+                    createCredit("Cast", (movie.cast || []).slice(0, 5).join(", "))
+                        .forEach((node) => credits.appendChild(node));
+                    els.detailCredits.replaceChildren(credits);
+
+                    if (movie.poster) {
+                        els.detailPoster.onload = () => {
+                            els.detailPoster.hidden = false;
+                            els.detailPlaceholder.hidden = true;
+                        };
+                        els.detailPoster.onerror = () => {
+                            els.detailPoster.hidden = true;
+                            els.detailPlaceholder.hidden = false;
+                        };
+                        els.detailPoster.alt = `Poster for ${movie.title}`;
+                        els.detailPoster.src = movie.poster;
+                    }
+                    els.detailStatus.textContent = "";
+                } catch (error) {
+                    els.detailStatus.textContent = `Could not load details: ${error.message}`;
+                }
+            }
+
+            function closeMovieDetails() {
+                els.modal.hidden = true;
+                document.body.classList.remove("modal-open");
+            }
+
+            els.liveTab.addEventListener("click", () => setView("live"));
+            els.moviesTab.addEventListener("click", () => setView("movies"));
+            window.addEventListener("hashchange", () => {
+                setView(window.location.hash === "#movies" ? "movies" : "live", false);
+            });
+
+            els.sections.addEventListener("click", (event) => {
+                const chip = event.target.closest(".movie-chip");
+                if (!chip) return;
+                resetAndLoad({ section: chip.dataset.section || "trending" });
+            });
+
+            els.genres.addEventListener("click", (event) => {
+                const chip = event.target.closest(".movie-chip");
+                if (!chip) return;
+                const genreId = Number(chip.dataset.genre) || null;
+                if (genreId) {
+                    resetAndLoad({
+                        section: "genre",
+                        genre: genreId,
+                        genreName: chip.dataset.name || "",
+                    });
+                } else {
+                    resetAndLoad({ section: "trending" });
+                }
+            });
+
+            els.search.addEventListener("input", (event) => {
+                const value = event.target.value;
+                els.clearSearch.hidden = value.length === 0;
+                clearTimeout(state.searchTimer);
+                state.searchTimer = setTimeout(() => {
+                    const query = value.trim();
+                    resetAndLoad({
+                        section: query ? "search" : "trending",
+                        query,
+                    });
+                }, 220);
+            });
+
+            els.clearSearch.addEventListener("click", () => {
+                clearTimeout(state.searchTimer);
+                resetAndLoad({ section: "trending" });
+                els.search.focus();
+            });
+
+            els.grid.addEventListener("click", (event) => {
+                const card = event.target.closest(".movie-card-button");
+                if (!card) return;
+                openMovieDetails(Number(card.dataset.movieId));
+            });
+
+            els.prev.addEventListener("click", () => {
+                if (state.page > 1) {
+                    state.page -= 1;
+                    loadMovies();
+                }
+            });
+
+            els.next.addEventListener("click", () => {
+                if (state.page < state.totalPages) {
+                    state.page += 1;
+                    loadMovies();
+                }
+            });
+
+            els.retry.addEventListener("click", () => loadMovies());
+            els.modalClose.addEventListener("click", closeMovieDetails);
+            els.modalSecondary.addEventListener("click", closeMovieDetails);
+            els.modal.addEventListener("click", (event) => {
+                if (event.target === els.modal) closeMovieDetails();
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape" && !els.modal.hidden) closeMovieDetails();
+            });
+
+            setView(state.view, false);
         });
     </script>
 </body>
