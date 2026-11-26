@@ -1,7 +1,7 @@
 {
-    "name": "ESINU — Live Channel Guide",
+    "name": "ESINU — Live TV & Movies",
     "short_name": "ESINU",
-    "description": "Browse channels by country and play public HLS streams.",
+    "description": "Browse live channels and movies, and play them inside ESINU.",
     "id": "/",
     "start_url": "/",
     "scope": "/",

@@ -1,7 +1,8 @@
 # ESINU
 
-ESINU is a small Flask app that downloads an M3U playlist, groups channels by
-country, and plays public HLS streams in the browser with `hls.js`.
+ESINU is a small Flask app for live TV and movies. It downloads an M3U playlist,
+groups channels by country, plays public HLS streams with `hls.js`, and provides
+a fast, refined movie browser with in-app playback.
 
 ## Run locally
 
@@ -31,12 +32,14 @@ phone, Add to Home Screen opens ESINU in a standalone window.
 | `GET /api/movies/<id>` | Movie details and credits |
 | `GET /stream/<id>` | Local HLS proxy for curated Ghanaian channels |
 | `GET /sw.js` | Service worker served with root scope |
+| `GET /robots.txt` | Minimal crawler policy |
 
 ## Movies
 
-The **Movies** tab browses a TMDB-backed movie catalog. It includes trending,
-popular, top-rated, now-playing and discover rows, search, genre chips,
-pagination and a details dialog with synopsis, rating, director and cast.
+The **Movies** tab browses a TMDB-backed movie catalog. It includes a featured
+title carousel, trending, popular, top-rated, now-playing and discover rows,
+recently played titles, one-click card playback, search, genre chips, pagination,
+loading skeletons and a details dialog with synopsis, rating, director and cast.
 
 ESINU proxies the metadata so the browser does not need direct API access.
 Selecting a movie opens its details, and **Play in ESINU** starts playback in

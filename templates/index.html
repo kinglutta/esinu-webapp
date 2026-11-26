@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#07100c">
-    <meta name="description" content="ESINU — a live channel guide for public HLS streams.">
+    <meta name="description" content="ESINU — live TV and movies in one polished streaming app.">
     <title>ESINU — Live Channel Guide</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
@@ -14,6 +14,13 @@
 </head>
 <body>
     <header class="topbar">
+        <div class="brand-lockup" aria-label="ESINU">
+            <span class="brand-glyph" aria-hidden="true">E</span>
+            <span class="brand-lockup-copy">
+                <strong>ESINU</strong>
+                <small>Streaming, refined</small>
+            </span>
+        </div>
         <nav class="view-tabs" aria-label="Main views">
             <button
                 id="view-live"
@@ -30,6 +37,10 @@
                 aria-controls="movies-view"
             >🎬 Movies</button>
         </nav>
+        <div class="topbar-meta" aria-hidden="true">
+            <span class="status-pill"><i></i> ONLINE</span>
+            <span id="app-clock" class="app-clock">--:--</span>
+        </div>
     </header>
 
     <div id="live-view" class="app">
@@ -62,7 +73,7 @@
                         id="clear-search"
                         class="icon-button clear-search"
                         type="button"
-                        aria-label="Clear search"
+                        aria-label="× Clear search"
                         title="Clear search"
                         hidden
                     >×</button>
@@ -108,12 +119,12 @@
                 </div>
 
                 <div class="player-actions" aria-label="Player controls">
-                    <button id="prev-channel" class="icon-button" type="button" title="Previous channel (K)" aria-label="Previous channel">‹</button>
-                    <button id="next-channel" class="icon-button" type="button" title="Next channel (J)" aria-label="Next channel">›</button>
-                    <button id="shuffle-channel" class="icon-button" type="button" title="Shuffle (S)" aria-label="Shuffle channels">⤨</button>
-                    <button id="favorite-channel" class="icon-button" type="button" title="Toggle favorite (F)" aria-label="Toggle favorite" aria-pressed="false">☆</button>
-                    <button id="refresh-channels" class="icon-button" type="button" title="Refresh list (R)" aria-label="Refresh channel list">⟳</button>
-                    <button id="fullscreen" class="icon-button" type="button" title="Fullscreen (Enter)" aria-label="Toggle fullscreen">⛶</button>
+                    <button id="prev-channel" class="icon-button" type="button" title="Previous channel (K)" aria-label="‹ Previous channel">‹</button>
+                    <button id="next-channel" class="icon-button" type="button" title="Next channel (J)" aria-label="› Next channel">›</button>
+                    <button id="shuffle-channel" class="icon-button" type="button" title="Shuffle (S)" aria-label="⤨ Shuffle channels">⤨</button>
+                    <button id="favorite-channel" class="icon-button" type="button" title="Toggle favorite (F)" aria-label="☆ Toggle favorite" aria-pressed="false">☆</button>
+                    <button id="refresh-channels" class="icon-button" type="button" title="Refresh list (R)" aria-label="⟳ Refresh channel list">⟳</button>
+                    <button id="fullscreen" class="icon-button" type="button" title="Fullscreen (Enter)" aria-label="⛶ Toggle fullscreen">⛶</button>
                 </div>
             </header>
 
@@ -134,7 +145,7 @@
         </main>
     </div>
 
-    <section id="movies-view" class="movies-view" aria-label="Movie browser" hidden>
+    <section id="movies-view" class="movies-view" role="main" aria-label="Movie browser" hidden>
         <div class="movies-toolbar">
             <div class="movies-heading">
                 <span class="movies-kicker">ESINU movies</span>
@@ -154,11 +165,33 @@
                     id="movie-search-clear"
                     class="icon-button clear-search"
                     type="button"
-                    aria-label="Clear movie search"
+                    aria-label="× Clear movie search"
                     title="Clear search"
                     hidden
                 >×</button>
             </div>
+        </div>
+
+        <section id="movie-hero" class="movie-hero" aria-label="Featured movie" hidden>
+            <div id="movie-hero-backdrop" class="movie-hero-backdrop" aria-hidden="true"></div>
+            <div class="movie-hero-shade" aria-hidden="true"></div>
+            <div class="movie-hero-content">
+                <span class="movie-hero-kicker">Featured now</span>
+                <h2 id="movie-hero-title">Featured movie</h2>
+                <p id="movie-hero-meta" class="movie-hero-meta"></p>
+                <p id="movie-hero-overview" class="movie-hero-overview"></p>
+                <div class="movie-hero-actions">
+                    <button id="movie-hero-play" class="hero-button primary" type="button">▶ Play now</button>
+                    <button id="movie-hero-info" class="hero-button ghost" type="button">ℹ More info</button>
+                </div>
+            </div>
+            <div id="movie-hero-dots" class="movie-hero-dots" aria-label="Featured titles"></div>
+            <p id="movie-hero-loading" class="movie-hero-loading">Loading featured titles...</p>
+        </section>
+
+        <div id="movie-recent" class="movie-recent" hidden>
+            <span class="movie-recent-label">Recently played</span>
+            <div id="movie-recent-list" class="movie-recent-list"></div>
         </div>
 
         <div id="movie-sections" class="movie-chip-row" aria-label="Movie categories">
@@ -175,9 +208,9 @@
         <div id="movie-grid" class="movie-grid" aria-live="polite"></div>
 
         <div id="movie-pagination" class="movie-pagination" hidden>
-            <button id="movie-prev" class="icon-button" type="button" aria-label="Previous movie page" title="Previous page">‹</button>
+            <button id="movie-prev" class="icon-button" type="button" aria-label="‹ Previous movie page" title="Previous page">‹</button>
             <span id="movie-page-info">Page 1 of 1</span>
-            <button id="movie-next" class="icon-button" type="button" aria-label="Next movie page" title="Next page">›</button>
+            <button id="movie-next" class="icon-button" type="button" aria-label="› Next movie page" title="Next page">›</button>
             <button id="movie-retry" class="movie-retry" type="button" hidden>Retry</button>
         </div>
 
@@ -197,7 +230,7 @@
                 id="movie-modal-close"
                 class="movie-modal-close icon-button"
                 type="button"
-                aria-label="Close movie details"
+                aria-label="× Close movie details"
                 title="Close (Esc)"
             >×</button>
             <div class="movie-dialog-poster">
@@ -245,7 +278,7 @@
                         id="movie-player-close"
                         class="icon-button"
                         type="button"
-                        aria-label="Close movie player"
+                        aria-label="× Close movie player"
                         title="Close (Esc)"
                     >×</button>
                 </div>
@@ -610,7 +643,9 @@
 
             function updateFavoriteButton() {
                 const active = state.selected ? isFavorite(state.selected) : false;
-                els.favorite.textContent = active ? "★" : "☆";
+                const mark = active ? "★" : "☆";
+                els.favorite.textContent = mark;
+                els.favorite.setAttribute("aria-label", `${mark} Toggle favorite`);
                 els.favorite.classList.toggle("is-favorite", active);
                 els.favorite.setAttribute("aria-pressed", String(active));
             }
@@ -991,6 +1026,16 @@
                 navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
             }
 
+            const clock = byId("app-clock");
+            const tickClock = () => {
+                clock.textContent = new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                });
+            };
+            tickClock();
+            setInterval(tickClock, 30000);
+
             window.esinuLoadChannels = loadChannels;
             if (window.location.hash !== "#movies") loadChannels();
         });
@@ -1011,6 +1056,17 @@
                 sections: byId("movie-sections"),
                 genres: byId("movie-genres"),
                 grid: byId("movie-grid"),
+                hero: byId("movie-hero"),
+                heroBackdrop: byId("movie-hero-backdrop"),
+                heroTitle: byId("movie-hero-title"),
+                heroMeta: byId("movie-hero-meta"),
+                heroOverview: byId("movie-hero-overview"),
+                heroPlay: byId("movie-hero-play"),
+                heroInfo: byId("movie-hero-info"),
+                heroDots: byId("movie-hero-dots"),
+                heroLoading: byId("movie-hero-loading"),
+                recent: byId("movie-recent"),
+                recentList: byId("movie-recent-list"),
                 status: byId("movie-status"),
                 pagination: byId("movie-pagination"),
                 prev: byId("movie-prev"),
@@ -1048,6 +1104,8 @@
 
             // In-app movie player endpoint.
             const PLAYER_BASE = "https://vidy.st/movie";
+            const RECENT_KEY = "esinu:recent-movies";
+            const HERO_INTERVAL = 7000;
 
             const state = {
                 view: window.location.hash === "#movies" ? "movies" : "live",
@@ -1060,6 +1118,9 @@
                 requestId: 0,
                 genresLoaded: false,
                 searchTimer: null,
+                heroMovies: [],
+                heroIndex: 0,
+                heroTimer: null,
             };
 
             async function api(path) {
@@ -1072,9 +1133,112 @@
                 return payload;
             }
 
+            function loadRecent() {
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+                    return Array.isArray(parsed) ? parsed.slice(0, 6) : [];
+                } catch (_) {
+                    return [];
+                }
+            }
+
+            function renderRecent() {
+                const movies = loadRecent();
+                els.recent.hidden = movies.length === 0;
+                els.recentList.replaceChildren();
+
+                movies.forEach((movie) => {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "movie-recent-pill";
+                    button.dataset.movieId = String(movie.id || "");
+                    button.dataset.title = movie.title || "Movie";
+                    button.textContent = movie.title || "Movie";
+                    els.recentList.appendChild(button);
+                });
+            }
+
+            function rememberMovie(movieId, title) {
+                const id = Number(movieId);
+                if (!id) return;
+                const movies = loadRecent().filter((movie) => Number(movie.id) !== id);
+                movies.unshift({ id, title: title || "Movie" });
+                try {
+                    localStorage.setItem(RECENT_KEY, JSON.stringify(movies.slice(0, 6)));
+                } catch (_) {
+                    // Storage may be disabled; the session still works.
+                }
+                renderRecent();
+            }
+
+            function showHero(index) {
+                const movies = state.heroMovies;
+                if (!movies.length) return;
+                const movie = movies[index % movies.length];
+                state.heroIndex = index % movies.length;
+
+                const image = movie.backdrop || movie.poster;
+                els.heroBackdrop.style.backgroundImage = image
+                    ? `linear-gradient(90deg, rgba(5, 10, 13, 0.96) 0%, rgba(5, 10, 13, 0.7) 45%, rgba(5, 10, 13, 0.2) 100%), url("${image}")`
+                    : "";
+                els.heroTitle.textContent = movie.title || "Featured movie";
+                els.heroMeta.textContent = [
+                    movie.year,
+                    movie.runtime ? `${movie.runtime} min` : null,
+                    Number(movie.rating) > 0 ? `★ ${Number(movie.rating).toFixed(1)}` : null,
+                    (movie.genres || [])[0],
+                ].filter(Boolean).join(" · ");
+                els.heroOverview.textContent = movie.overview || "";
+                els.heroPlay.dataset.movieId = String(movie.id || "");
+                els.heroPlay.dataset.title = movie.title || "Movie";
+                els.heroInfo.dataset.movieId = String(movie.id || "");
+
+                els.heroDots.querySelectorAll("button").forEach((dot, dotIndex) => {
+                    const active = dotIndex === state.heroIndex;
+                    dot.classList.toggle("is-active", active);
+                    dot.setAttribute("aria-pressed", String(active));
+                });
+            }
+
+            function renderHero(movies) {
+                clearInterval(state.heroTimer);
+                state.heroMovies = Array.isArray(movies) ? movies.slice(0, 5) : [];
+                els.heroDots.replaceChildren();
+
+                if (!state.heroMovies.length) {
+                    els.hero.hidden = true;
+                    return;
+                }
+
+                state.heroMovies.forEach((_, index) => {
+                    const dot = document.createElement("button");
+                    dot.type = "button";
+                    dot.className = "hero-dot";
+                    dot.setAttribute("aria-label", `Show featured title ${index + 1}`);
+                    dot.dataset.index = String(index);
+                    els.heroDots.appendChild(dot);
+                });
+
+                els.hero.hidden = false;
+                els.heroLoading.hidden = true;
+                showHero(0);
+                state.heroTimer = setInterval(() => {
+                    showHero(state.heroIndex + 1);
+                }, HERO_INTERVAL);
+            }
+
             function setView(view, updateHash = true) {
                 const moviesActive = view === "movies";
                 state.view = view;
+
+                if (!moviesActive && state.heroTimer) {
+                    clearInterval(state.heroTimer);
+                    state.heroTimer = null;
+                } else if (moviesActive && state.heroMovies.length && !state.heroTimer) {
+                    state.heroTimer = setInterval(() => {
+                        showHero(state.heroIndex + 1);
+                    }, HERO_INTERVAL);
+                }
 
                 els.movies.hidden = !moviesActive;
                 els.live.hidden = moviesActive;
@@ -1115,6 +1279,21 @@
                 return placeholder;
             }
 
+            function renderSkeletons() {
+                const fragment = document.createDocumentFragment();
+                for (let index = 0; index < 10; index += 1) {
+                    const card = document.createElement("div");
+                    card.className = "movie-skeleton";
+                    const poster = document.createElement("div");
+                    poster.className = "movie-skeleton-poster";
+                    const line = document.createElement("div");
+                    line.className = "movie-skeleton-line";
+                    card.append(poster, line);
+                    fragment.appendChild(card);
+                }
+                els.grid.replaceChildren(fragment);
+            }
+
             function createMovieCard(movie) {
                 const article = document.createElement("article");
                 article.className = "movie-card";
@@ -1123,7 +1302,7 @@
                 button.type = "button";
                 button.className = "movie-card-button";
                 button.dataset.movieId = String(movie.id);
-                button.setAttribute("aria-label", `View details for ${movie.title}`);
+                button.dataset.title = movie.title || "Movie";
 
                 const poster = document.createElement("div");
                 poster.className = "movie-poster";
@@ -1162,7 +1341,17 @@
                     .join(" · ") || "ESINU";
                 body.append(title, meta);
                 button.append(poster, body);
-                article.appendChild(button);
+
+                const play = document.createElement("button");
+                play.type = "button";
+                play.className = "movie-card-play";
+                play.dataset.movieId = String(movie.id);
+                play.dataset.title = movie.title || "Movie";
+                play.setAttribute("aria-label", `▶ Play ${movie.title}`);
+                play.title = `Play ${movie.title}`;
+                play.textContent = "▶";
+
+                article.append(button, play);
                 return article;
             }
 
@@ -1213,6 +1402,7 @@
                 const requestId = ++state.requestId;
                 state.loading = true;
                 els.grid.classList.add("is-loading");
+                renderSkeletons();
                 setStatus("Loading movies...", false);
 
                 try {
@@ -1232,6 +1422,15 @@
                     state.totalPages = Number(payload.totalPages) || 1;
                     renderMovies(payload);
                     updatePagination();
+                    renderRecent();
+
+                    if (state.section === "trending" && !state.query && !state.genre && state.page === 1) {
+                        renderHero(payload.results || []);
+                    } else {
+                        clearInterval(state.heroTimer);
+                        state.heroTimer = null;
+                        els.hero.hidden = true;
+                    }
 
                     const label = SECTION_LABELS[state.section] || "Movies";
                     const title = state.genre
@@ -1373,8 +1572,10 @@
 
             function playMovie(movieId, title) {
                 if (!movieId) return;
-                const id = encodeURIComponent(String(movieId));
+                const rawId = String(movieId);
+                const id = encodeURIComponent(rawId);
                 const safeTitle = title || "Movie";
+                rememberMovie(rawId, safeTitle);
 
                 els.modal.hidden = true;
                 byId("video-player")?.pause();
@@ -1448,9 +1649,38 @@
             });
 
             els.grid.addEventListener("click", (event) => {
+                const play = event.target.closest(".movie-card-play");
+                if (play) {
+                    playMovie(play.dataset.movieId, play.dataset.title);
+                    return;
+                }
                 const card = event.target.closest(".movie-card-button");
                 if (!card) return;
                 openMovieDetails(Number(card.dataset.movieId));
+            });
+
+            els.heroDots.addEventListener("click", (event) => {
+                const dot = event.target.closest(".hero-dot");
+                if (!dot) return;
+                showHero(Number(dot.dataset.index) || 0);
+                clearInterval(state.heroTimer);
+                state.heroTimer = setInterval(() => {
+                    showHero(state.heroIndex + 1);
+                }, HERO_INTERVAL);
+            });
+
+            els.heroPlay.addEventListener("click", () => {
+                playMovie(els.heroPlay.dataset.movieId, els.heroPlay.dataset.title);
+            });
+
+            els.heroInfo.addEventListener("click", () => {
+                openMovieDetails(Number(els.heroInfo.dataset.movieId));
+            });
+
+            els.recentList.addEventListener("click", (event) => {
+                const pill = event.target.closest(".movie-recent-pill");
+                if (!pill) return;
+                playMovie(pill.dataset.movieId, pill.dataset.title);
             });
 
             els.prev.addEventListener("click", () => {
@@ -1494,6 +1724,7 @@
                 }
             });
 
+            renderRecent();
             setView(state.view, false);
         });
     </script>

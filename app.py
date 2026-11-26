@@ -660,6 +660,12 @@ def service_worker():
     return response
 
 
+@app.get("/robots.txt")
+def robots():
+    """Serve a minimal robots policy for crawlers and audits."""
+    return Response("User-agent: *\nAllow: /\n", mimetype="text/plain")
+
+
 @app.get("/api/channels")
 def api_channels():
     """Return channels as JSON; pass ``?refresh=1`` to force a re-download."""
